@@ -306,19 +306,33 @@
   function startGame() {
     initAudio();
     
-    // Show countdown overlay
+    // CRITICAL FIX: Force resize calculation BEFORE showing countdown
+    // The canvas needs to be visible to get correct dimensions
     elements.startScreen.style.display = 'none';
+    handleResize(); // Recalculate dimensions now that canvas is visible
+    
+    console.log('After resize:', {
+      width: gameState.gameWidth,
+      height: gameState.gameHeight
+    });
+    
+    // Show countdown overlay
     elements.countdown.classList.add('active');
     elements.note.style.display = 'block';
     elements.scoreDisplay.style.display = 'none'; // Hide score during countdown
     
-    // Position note immediately
+    // Position note immediately with correct dimensions
     gameState.noteY = gameState.gameHeight / 2 - NOTE_SIZE / 2;
     gameState.noteVelocity = 0;
     gameState.currentRotation = 0;
     const initialX = gameState.gameWidth * 0.2;
     elements.note.style.transform = `translate(${initialX}px, ${gameState.noteY}px) rotate(0deg)`;
     void elements.note.offsetHeight;
+    
+    console.log('Note positioned at:', {
+      noteY: gameState.noteY,
+      initialX: initialX
+    });
     
     // Countdown sequence: 3... 2... 1... GO!
     let count = 3;
