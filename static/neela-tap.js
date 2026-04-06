@@ -93,9 +93,9 @@
   }
 
   // --- Constants & Config ---
-  const GRAVITY = 0.45;
-  const FLAP_STRENGTH = -7.5;
-  const TERMINAL_VELOCITY = 9;
+  const GRAVITY = 0.22;
+  const FLAP_STRENGTH = -5.5;
+  const TERMINAL_VELOCITY = 6;
   const PIPE_SPEED_BASE = 2.5;
   const MAX_PIPE_SPEED = 5.0;
   const PIPE_WIDTH = 52;
@@ -257,29 +257,33 @@
     elements.quitGame.addEventListener('click', quitGame);
     elements.readyBanner.addEventListener('click', handleMixReady);
     
-    // Core game inputs
-    document.addEventListener('keydown', (e) => {
-      if (gameState.isPlaying && !gameState.isPaused && e.code === 'Space') {
-        e.preventDefault();
-        jump();
-      }
-    }); // Make sure this persists globally before start
-    
-    elements.canvas.addEventListener('mousedown', (e) => {
-      if (e.target.closest('.neela-start-screen, .neela-game-over')) return;
-      if (gameState.isPlaying && !gameState.isPaused) jump();
-    });
-    
-    elements.canvas.addEventListener('touchstart', (e) => {
-      if (e.target.closest('.neela-start-screen, .neela-game-over, .neela-quit-btn')) return;
-      if (gameState.isPlaying && !gameState.isPaused) {
-        e.preventDefault();
-        jump();
-      }
-    }, {passive: false});
-    
     window.addEventListener('resize', handleResize);
     handleResize();
+  }
+
+  function handleKeyDown(e) {
+    if (e.code === 'Space' || e.key === ' ') {
+      e.preventDefault();
+      if (gameState.isPlaying && !gameState.isPaused) jump();
+    }
+  }
+
+  function handlePointerDown(e) {
+    if (e.target.closest('.neela-start-screen, .neela-game-over, .neela-quit-btn')) return;
+    if (e.type === 'touchstart') e.preventDefault();
+    if (gameState.isPlaying && !gameState.isPaused) jump();
+  }
+
+  function attachGameInputs() {
+    document.addEventListener('keydown', handleKeyDown);
+    elements.canvas.addEventListener('mousedown', handlePointerDown);
+    elements.canvas.addEventListener('touchstart', handlePointerDown, {passive: false});
+  }
+
+  function detachGameInputs() {
+    document.removeEventListener('keydown', handleKeyDown);
+    elements.canvas.removeEventListener('mousedown', handlePointerDown);
+    elements.canvas.removeEventListener('touchstart', handlePointerDown);
   }
 
   function handleResize() {
@@ -313,6 +317,7 @@
     gameState.lastPipeTimestamp = 0; 
     
     updateScoreDisplay();
+    attachGameInputs();
     gameState.animationId = requestAnimationFrame(gameLoop);
   }
 
@@ -331,6 +336,7 @@
       cancelAnimationFrame(gameState.animationId);
       gameState.animationId = null;
     }
+    detachGameInputs();
     clearPipes();
     clearParticles();
     elements.note.style.display = 'none';
