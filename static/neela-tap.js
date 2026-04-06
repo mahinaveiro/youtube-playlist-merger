@@ -67,7 +67,7 @@
   function initBackgroundMusic() {
     if (bgMusic) return; // Already initialized
     
-    bgMusic = new Audio('/public/song.mp3');
+    bgMusic = new Audio('/static/song.mp3');
     bgMusic.loop = true;
     bgMusic.volume = 0; // Start at 0 for fade in
     
