@@ -24,6 +24,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install bgutil-ytdlp-pot-provider plugin for YouTube PO Token generation
+RUN pip install --no-cache-dir -U bgutil-ytdlp-pot-provider
+
 # Copy application files
 COPY . .
 
@@ -33,6 +36,7 @@ RUN echo "=== Build Diagnostics ===" && \
     which node && node --version && \
     which ffmpeg && ffmpeg -version && \
     python -c "from yt_dlp.dependencies import yt_dlp_ejs; print('yt-dlp-ejs:', bool(yt_dlp_ejs))" && \
+    python -c "import bgutil_ytdlp_pot_provider; print('bgutil-ytdlp-pot-provider:', bgutil_ytdlp_pot_provider.__version__)" && \
     echo "========================="
 
 # Expose port

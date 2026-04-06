@@ -94,6 +94,26 @@ async def startup_diagnostics():
     except ImportError:
         log.warning("yt-dlp-ejs: import failed")
     
+    # Check bgutil-ytdlp-pot-provider plugin
+    try:
+        import bgutil_ytdlp_pot_provider
+        log.info(f"bgutil-ytdlp-pot-provider: {bgutil_ytdlp_pot_provider.__version__}")
+    except ImportError:
+        log.warning("bgutil-ytdlp-pot-provider: NOT installed")
+    
+    # Test bgutil provider connectivity
+    bgutil_url = "http://bgutil-provider.railway.internal:4416"
+    try:
+        import urllib.request
+        with urllib.request.urlopen(f"{bgutil_url}/health", timeout=5) as response:
+            if response.status == 200:
+                log.info(f"bgutil provider: CONNECTED at {bgutil_url}")
+            else:
+                log.warning(f"bgutil provider: responded with status {response.status}")
+    except Exception as e:
+        log.warning(f"bgutil provider: NOT reachable at {bgutil_url} - {e}")
+        log.warning("Make sure bgutil-provider service is running on Railway")
+    
     log.info("===========================")
 
 
@@ -240,6 +260,9 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST")
         if age_days > 30:
             log.warning(f"cookies.txt is {age_days:.0f} days old. Consider refreshing for better reliability.")
     
+    # bgutil PO Token provider URL (Railway private network)
+    bgutil_url = "http://bgutil-provider.railway.internal:4416"
+    
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": f"{job_dir.as_posix()}/%(playlist_index)02d - %(title)s.%(ext)s",
@@ -255,9 +278,13 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST")
         "ignoreerrors": True,
         "yes_playlist": True,
         "no_warnings": False,
+        "sleep_interval": 5,  # Avoid YouTube rate limiting
         "extractor_args": {
             "youtube": {
                 "player_client": ["web", "web_embedded", "tv"],
+            },
+            "youtubepot-bgutil:http": {
+                "base_url": bgutil_url,
             },
         },
     }
