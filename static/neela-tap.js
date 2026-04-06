@@ -38,6 +38,10 @@
 
   // --- Web Audio API Setup ---
   let audioCtx = null;
+  let bgMusic = null;
+  let bgMusicGain = null;
+  let isMusicMuted = false;
+  const MUSIC_MUTE_KEY = 'neela_tap_music_muted';
   
   function initAudio() {
     if (!audioCtx) {
@@ -49,6 +53,78 @@
     if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
+  }
+  
+  function loadMusicMuteState() {
+    const saved = localStorage.getItem(MUSIC_MUTE_KEY);
+    isMusicMuted = saved === 'true';
+  }
+  
+  function saveMusicMuteState() {
+    localStorage.setItem(MUSIC_MUTE_KEY, isMusicMuted.toString());
+  }
+  
+  function initBackgroundMusic() {
+    if (bgMusic) return; // Already initialized
+    
+    bgMusic = new Audio('/public/song.mp3');
+    bgMusic.loop = true;
+    bgMusic.volume = 0; // Start at 0 for fade in
+    
+    loadMusicMuteState();
+    updateMuteButtonUI();
+  }
+  
+  function fadeInMusic() {
+    if (!bgMusic || isMusicMuted) return;
+    
+    bgMusic.volume = 0;
+    bgMusic.play().catch(e => console.log('Music play failed:', e));
+    
+    // Fade in over 1 second
+    let volume = 0;
+    const fadeInterval = setInterval(() => {
+      volume += 0.02;
+      if (volume >= 0.4) {
+        volume = 0.4;
+        clearInterval(fadeInterval);
+      }
+      bgMusic.volume = volume;
+    }, 20);
+  }
+  
+  function fadeOutMusic() {
+    if (!bgMusic) return;
+    
+    let volume = bgMusic.volume;
+    const fadeInterval = setInterval(() => {
+      volume -= 0.02;
+      if (volume <= 0) {
+        volume = 0;
+        clearInterval(fadeInterval);
+        bgMusic.pause();
+        bgMusic.currentTime = 0;
+      }
+      bgMusic.volume = volume;
+    }, 20);
+  }
+  
+  function toggleMusicMute() {
+    isMusicMuted = !isMusicMuted;
+    saveMusicMuteState();
+    updateMuteButtonUI();
+    
+    if (isMusicMuted) {
+      fadeOutMusic();
+    } else if (gameState.isPlaying) {
+      fadeInMusic();
+    }
+  }
+  
+  function updateMuteButtonUI() {
+    if (!elements.muteBtn) return;
+    elements.muteBtn.textContent = isMusicMuted ? '🔇' : '🔊';
+    elements.muteBtn.title = isMusicMuted ? 'Unmute Music' : 'Mute Music';
   }
 
   function playOscillator(freq, type, duration, vol, rampToFreq=null, rampDuration=0) {
@@ -132,6 +208,7 @@
     createGameElements();
     createBackgroundTexts();
     setupEventListeners();
+    initBackgroundMusic();
   }
 
   function loadHighScore() {
@@ -196,6 +273,8 @@
         <div class="neela-countdown" id="neela-countdown">
           <div class="neela-countdown-number" id="neela-countdown-number">3</div>
         </div>
+        
+        <button class="neela-mute-btn" id="neela-mute-btn" title="Mute Music">🔊</button>
       </div>
     `;
 
@@ -212,6 +291,7 @@
       readyBanner: document.getElementById('neela-ready-banner'),
       countdown: document.getElementById('neela-countdown'),
       countdownNumber: document.getElementById('neela-countdown-number'),
+      muteBtn: document.getElementById('neela-mute-btn'),
       tapStart: document.getElementById('neela-tap-start'),
       quitStart: document.getElementById('neela-quit-start'),
       playAgain: document.getElementById('neela-play-again'),
@@ -282,6 +362,7 @@
     elements.playAgain.addEventListener('click', restartGame);
     elements.quitGame.addEventListener('click', quitGame);
     elements.readyBanner.addEventListener('click', handleMixReady);
+    elements.muteBtn.addEventListener('click', toggleMusicMute);
     
     window.addEventListener('resize', handleResize);
     handleResize();
@@ -392,6 +473,9 @@
     
     updateScoreDisplay();
     attachGameInputs();
+    
+    // Start background music with fade in
+    fadeInMusic();
     
     gameState.animationId = requestAnimationFrame(gameLoop);
   }
@@ -690,6 +774,9 @@
 
     playGameOverSound();
     saveHighScore();
+    
+    // Fade out background music
+    fadeOutMusic();
 
     elements.finalScore.textContent = gameState.score;
     elements.finalBest.textContent = gameState.highScore;

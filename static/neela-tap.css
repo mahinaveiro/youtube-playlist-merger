@@ -433,6 +433,40 @@
     0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
+/* Mute Button */
+.neela-mute-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 48px;
+  height: 48px;
+  background: rgba(30, 30, 45, 0.8);
+  border: 2px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  color: #a78bfa;
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  backdrop-filter: blur(4px);
+}
+
+.neela-mute-btn:hover {
+  background: rgba(30, 30, 45, 0.95);
+  border-color: rgba(139, 92, 246, 0.6);
+  transform: scale(1.05);
+}
+
+.neela-mute-btn:active {
+  transform: scale(0.95);
+}
+
 @keyframes neela-countdown-pop {
   0% {
     opacity: 0;
