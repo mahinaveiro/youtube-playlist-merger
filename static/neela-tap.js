@@ -353,6 +353,16 @@
   }
   
   function actuallyStartGame() {
+    console.log('=== GAME STARTING ===');
+    console.log('Game dimensions:', {
+      width: gameState.gameWidth,
+      height: gameState.gameHeight
+    });
+    console.log('Initial note position:', {
+      noteY: gameState.noteY,
+      noteVelocity: gameState.noteVelocity
+    });
+    
     elements.scoreDisplay.style.display = 'block';
     elements.gameOver.classList.remove('active');
     
@@ -614,15 +624,34 @@
   function checkCollisions() {
     // Boundary check
     if (gameState.noteY < 0 || gameState.noteY + NOTE_SIZE > gameState.gameHeight) {
+      console.log('COLLISION: Boundary hit', {
+        noteY: gameState.noteY,
+        gameHeight: gameState.gameHeight,
+        topBoundary: gameState.noteY < 0,
+        bottomBoundary: gameState.noteY + NOTE_SIZE > gameState.gameHeight
+      });
       triggerGameOver();
       return;
     }
 
     const noteRect = elements.noteInner.getBoundingClientRect();
     
+    console.log('Collision check:', {
+      noteRect: {
+        width: noteRect.width,
+        height: noteRect.height,
+        left: noteRect.left,
+        top: noteRect.top
+      },
+      noteY: gameState.noteY,
+      gameHeight: gameState.gameHeight,
+      pipeCount: gameState.pipes.length
+    });
+    
     // CRITICAL FIX: Safety check - ensure note has valid dimensions before collision detection
     // This prevents false collisions when note isn't fully rendered yet
     if (noteRect.width === 0 || noteRect.height === 0) {
+      console.log('SKIPPING collision check - note not rendered');
       return; // Skip collision check this frame
     }
     
@@ -647,6 +676,11 @@
       };
 
       if (intersect(noteHitbox, topRect) || intersect(noteHitbox, botRect)) {
+        console.log('COLLISION: Pipe hit', {
+          noteHitbox,
+          topRect: {left: topRect.left, right: topRect.right, top: topRect.top, bottom: topRect.bottom},
+          botRect: {left: botRect.left, right: botRect.right, top: botRect.top, bottom: botRect.bottom}
+        });
         triggerGameOver();
         return;
       }
