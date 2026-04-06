@@ -218,13 +218,23 @@
   }
 
   function createBackgroundTexts() {
-    const text = document.createElement('div');
-    text.className = 'neela-bg-text';
-    text.textContent = 'Codanela Production';
-    text.style.top = '50%';
-    text.style.left = '100%';
-    elements.canvas.appendChild(text);
-    gameState.bgTexts.push({ element: text, x: 100, speed: 0.2 });
+    // First text: "Codanela Production"
+    const text1 = document.createElement('div');
+    text1.className = 'neela-bg-text';
+    text1.textContent = 'Codanela Production';
+    text1.style.top = '35%';
+    text1.style.left = '100%';
+    elements.canvas.appendChild(text1);
+    gameState.bgTexts.push({ element: text1, x: 100, speed: 0.15 });
+
+    // Second text: "Created by Mahin"
+    const text2 = document.createElement('div');
+    text2.className = 'neela-bg-text';
+    text2.textContent = 'Created by Mahin';
+    text2.style.top = '65%';
+    text2.style.left = '100%';
+    elements.canvas.appendChild(text2);
+    gameState.bgTexts.push({ element: text2, x: 100, speed: 0.18 });
 
     createClouds();
     createMoon();
@@ -622,11 +632,17 @@
   function updateBackgroundTexts() {
     gameState.bgTexts.forEach(text => {
       text.x -= text.speed;
+      
+      // For background texts (not clouds), reset when completely off-screen to the left
+      // This ensures they scroll all the way from right to left
       if (text.isCloud) {
         if (text.x < -10) text.x = 110;
       } else {
+        // For text elements, reset when they've scrolled completely off the left side
+        // Use -50 to ensure text fully exits before looping
         if (text.x < -50) text.x = 150;
       }
+      
       text.element.style.left = `${text.x}%`;
     });
   }
