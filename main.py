@@ -9,6 +9,7 @@ like a normal client and parses the returned pages/player responses.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -61,7 +62,6 @@ async def schedule_job_cleanup(job_id: str, delay_hours: int = 1):
 async def startup_diagnostics():
     """Log runtime paths and yt-dlp-ejs availability on startup."""
     import os
-    
     deno = shutil.which("deno")
     node = shutil.which("node")
     ffmpeg = shutil.which("ffmpeg")
@@ -276,7 +276,32 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST")
             log.warning(f"cookies.txt is {age_days:.0f} days old. Consider refreshing for better reliability.")
     
     # bgutil PO Token provider URL (Railway private network)
-    bgutil_url = "http://bgutil-provider.railway.internal:4416"
+    # Can be overridden with BGUTIL_PROVIDER_URL environment variable
+    # Try multiple connection methods for Railway
+    bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL")
+    
+    if not bgutil_url:
+        # Try different Railway private networking patterns
+        possible_urls = [
+            "http://bgutil-provider.railway.internal:4416",
+            "http://bgutil-provider:4416",  # Sometimes Railway uses short names
+        ]
+        bgutil_url = possible_urls[0]  # Default to first
+        log.info(f"Trying bgutil URLs: {possible_urls}")
+    
+    log.info(f"bgutil provider URL: {bgutil_url}")
+    
+    # Check if bgutil is reachable (non-blocking)
+    bgutil_available = False
+    try:
+        import urllib.request
+        with urllib.request.urlopen(f"{bgutil_url}/health", timeout=2) as response:
+            if response.status == 200:
+                bgutil_available = True
+                log.info("bgutil provider: AVAILABLE")
+    except Exception as e:
+        log.warning(f"bgutil provider not reachable: {e}")
+        log.warning("Continuing without bgutil - will rely on cookies only")
     
     ydl_opts = {
         "format": "bestaudio/best",
