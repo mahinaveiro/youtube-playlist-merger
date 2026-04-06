@@ -99,7 +99,22 @@ async def startup_diagnostics():
         import bgutil_ytdlp_pot_provider
         log.info(f"bgutil-ytdlp-pot-provider: {bgutil_ytdlp_pot_provider.__version__}")
     except ImportError:
-        log.warning("bgutil-ytdlp-pot-provider: NOT installed")
+        # Plugin is installed but can't be imported directly - this is normal for yt-dlp plugins
+        # Check if it's in pip list instead
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["pip", "list"], 
+                capture_output=True, 
+                text=True, 
+                timeout=5
+            )
+            if "bgutil-ytdlp-pot-provider" in result.stdout:
+                log.info("bgutil-ytdlp-pot-provider: installed (yt-dlp plugin)")
+            else:
+                log.warning("bgutil-ytdlp-pot-provider: NOT found in pip list")
+        except Exception:
+            log.info("bgutil-ytdlp-pot-provider: unable to verify (check manually)")
     
     # Test bgutil provider connectivity
     bgutil_url = "http://bgutil-provider.railway.internal:4416"
