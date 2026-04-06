@@ -7,15 +7,16 @@
 (function () {
   'use strict';
 
-  const GRAVITY = 0.6;
-  const FLAP_STRENGTH = -10;
-  const PIPE_SPEED_BASE = 3;
-  const PIPE_GAP = 180;
+  const GRAVITY = 0.5;
+  const FLAP_STRENGTH = -9;
+  const PIPE_SPEED_BASE = 2.5;
+  const PIPE_GAP = 200;
   const PIPE_WIDTH = 60;
-  const PIPE_SPAWN_INTERVAL = 1800;
-  const NOTE_SIZE = 48;
-  const SPEED_INCREASE_PER_SCORE = 0.15;
+  const PIPE_SPAWN_INTERVAL = 2000;
+  const NOTE_SIZE = 40;
+  const SPEED_INCREASE_PER_SCORE = 0.1;
   const HIGH_SCORE_KEY = 'neela_tap_highscore';
+  const SAFE_MARGIN = 50; // Safe margin from top/bottom
 
   let gameState = {
     isPlaying: false,
@@ -72,7 +73,11 @@
         </div>
         
         <div class="neela-score" id="neela-score" style="display: none;">0</div>
-        <div class="neela-note" id="neela-note" style="display: none;">♪</div>
+        <div class="neela-note" id="neela-note" style="display: none;">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="100%" height="100%">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+        </div>
         
         <div class="neela-game-over" id="neela-game-over">
           <div class="neela-game-over-card">
@@ -87,7 +92,13 @@
         </div>
         
         <div class="neela-ready-banner" id="neela-ready-banner">
-          🎉 Your mix is ready! Tap here to get it
+          <svg class="neela-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+            <line x1="9" y1="9" x2="9.01" y2="9"/>
+            <line x1="15" y1="9" x2="15.01" y2="9"/>
+          </svg>
+          Your mix is ready! Tap here to get it
         </div>
       </div>
     `;
@@ -110,20 +121,57 @@
   }
 
   function createBackgroundTexts() {
-    const positions = [15, 35, 55, 75];
-    positions.forEach((top, index) => {
-      const text = document.createElement('div');
-      text.className = 'neela-bg-text';
-      text.textContent = 'Codanela Production';
-      text.style.top = `${top}%`;
-      text.style.left = `${100 + index * 50}%`;
-      elements.canvas.appendChild(text);
+    // Create single scrolling text
+    const text = document.createElement('div');
+    text.className = 'neela-bg-text';
+    text.textContent = 'Codanela Production';
+    text.style.top = '50%';
+    text.style.left = '100%';
+    elements.canvas.appendChild(text);
+    gameState.bgTexts.push({
+      element: text,
+      x: 100,
+      speed: 0.2,
+    });
+
+    // Create clouds
+    createClouds();
+    
+    // Create moon
+    createMoon();
+  }
+
+  function createClouds() {
+    const cloudPositions = [
+      { top: 15, left: 20, size: 60 },
+      { top: 25, left: 70, size: 80 },
+      { top: 10, left: 50, size: 50 },
+    ];
+    
+    cloudPositions.forEach((pos, index) => {
+      const cloud = document.createElement('div');
+      cloud.className = 'neela-cloud';
+      cloud.style.top = `${pos.top}%`;
+      cloud.style.left = `${pos.left}%`;
+      cloud.style.width = `${pos.size}px`;
+      cloud.style.height = `${pos.size * 0.6}px`;
+      elements.canvas.appendChild(cloud);
+      
       gameState.bgTexts.push({
-        element: text,
-        x: 100 + index * 50,
-        speed: 0.3 + index * 0.1,
+        element: cloud,
+        x: pos.left,
+        speed: 0.05 + index * 0.02,
+        isCloud: true,
       });
     });
+  }
+
+  function createMoon() {
+    const moon = document.createElement('div');
+    moon.className = 'neela-moon';
+    moon.style.top = '12%';
+    moon.style.right = '15%';
+    elements.canvas.appendChild(moon);
   }
 
   function setupEventListeners() {
@@ -159,10 +207,10 @@
     gameState.isPlaying = true;
     gameState.isPaused = false;
     gameState.score = 0;
-    gameState.noteY = gameState.gameHeight / 2;
+    gameState.noteY = gameState.gameHeight / 2 - NOTE_SIZE / 2;
     gameState.noteVelocity = 0;
     gameState.pipes = [];
-    gameState.lastPipeTime = 0;
+    gameState.lastPipeTime = Date.now(); // Start timer now
     gameState.pipeSpeed = PIPE_SPEED_BASE;
     
     updateScoreDisplay();
@@ -231,12 +279,12 @@
     gameState.noteVelocity += GRAVITY;
     gameState.noteY += gameState.noteVelocity;
 
-    // Boundaries
+    // Boundaries - with safe margin
     if (gameState.noteY < 0) {
-      gameState.noteY = 0;
-      gameState.noteVelocity = 0;
+      endGame();
+      return;
     }
-    if (gameState.noteY > gameState.gameHeight - NOTE_SIZE) {
+    if (gameState.noteY + NOTE_SIZE > gameState.gameHeight) {
       endGame();
       return;
     }
@@ -280,8 +328,14 @@
   }
 
   function spawnPipe() {
-    const minGapTop = 80;
-    const maxGapTop = gameState.gameHeight - PIPE_GAP - 80;
+    const minGapTop = SAFE_MARGIN + 50;
+    const maxGapTop = gameState.gameHeight - PIPE_GAP - SAFE_MARGIN - 50;
+    
+    // Ensure valid range
+    if (maxGapTop <= minGapTop) {
+      return; // Screen too small, skip spawning
+    }
+    
     const gapTop = Math.random() * (maxGapTop - minGapTop) + minGapTop;
 
     const topPipe = document.createElement('div');
@@ -320,9 +374,19 @@
   function updateBackgroundTexts() {
     gameState.bgTexts.forEach(text => {
       text.x -= text.speed;
-      if (text.x < -100) {
-        text.x = 120;
+      
+      if (text.isCloud) {
+        // Clouds wrap around
+        if (text.x < -10) {
+          text.x = 110;
+        }
+      } else {
+        // Text wraps around
+        if (text.x < -50) {
+          text.x = 150;
+        }
       }
+      
       text.element.style.left = `${text.x}%`;
     });
   }
@@ -332,20 +396,16 @@
     const noteRight = noteX + NOTE_SIZE;
     const noteBottom = gameState.noteY + NOTE_SIZE;
 
-    // Check top/bottom boundaries
-    if (gameState.noteY <= 0 || noteBottom >= gameState.gameHeight) {
-      endGame();
-      return;
-    }
-
-    // Check pipe collisions
+    // Check pipe collisions with some tolerance
+    const tolerance = 5;
+    
     for (const pipe of gameState.pipes) {
       const pipeRight = pipe.x + PIPE_WIDTH;
       
       // Check if note overlaps with pipe horizontally
-      if (noteRight > pipe.x && noteX < pipeRight) {
+      if (noteRight - tolerance > pipe.x && noteX + tolerance < pipeRight) {
         // Check if note is outside the gap vertically
-        if (gameState.noteY < pipe.gapTop || noteBottom > pipe.gapBottom) {
+        if (gameState.noteY + tolerance < pipe.gapTop || noteBottom - tolerance > pipe.gapBottom) {
           endGame();
           return;
         }
