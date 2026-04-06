@@ -46,12 +46,12 @@ Open **http://127.0.0.1:8000**
 
 ## API (for reference)
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/create-job` | JSON body `{"url":"..."}` → `{ "job_id": "..." }`, starts background work |
-| GET | `/status/{job_id}` | `{ "stage", "message", "error" }` — stages: `fetching`, `downloading`, `merging`, `completed`, `error` |
-| GET | `/download/{job_id}` | One-click download of `ULTIMATE_PLAYLIST.mp3` when `completed` |
-| POST | `/cleanup/{job_id}` | Deletes the job’s folder under `temp/` and clears server-side job state |
+| Method | Path                 | Purpose                                                                                                |
+| ------ | -------------------- | ------------------------------------------------------------------------------------------------------ |
+| POST   | `/create-job`        | JSON body `{"url":"..."}` → `{ "job_id": "..." }`, starts background work                              |
+| GET    | `/status/{job_id}`   | `{ "stage", "message", "error" }` — stages: `fetching`, `downloading`, `merging`, `completed`, `error` |
+| GET    | `/download/{job_id}` | One-click download of `ULTIMATE_PLAYLIST.mp3` when `completed`                                         |
+| POST   | `/cleanup/{job_id}`  | Deletes the job’s folder under `temp/` and clears server-side job state                                |
 
 Temporary files live under `temp/<job_id>/` (created automatically).
 
@@ -75,3 +75,13 @@ youtube-playlist-merger/
 ├── requirements.txt
 └── README.md
 ```
+
+## Troubleshooting deployment issues
+
+If you see errors like "n challenge solving failed" or "Only images are available for download":
+
+1. Verify deno/node are installed: `which deno && which node`
+2. Check startup logs for "Startup Diagnostics" section showing runtime paths
+3. Ensure yt-dlp-ejs is installed: `python -c "from yt_dlp.dependencies import yt_dlp_ejs; print(bool(yt_dlp_ejs))"`
+4. Update your cookies.txt with fresh YouTube cookies (export from browser using an extension like "Get cookies.txt LOCALLY")
+5. Some videos may be region-restricted or require authentication even with cookies

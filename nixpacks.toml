@@ -4,8 +4,15 @@ nixPkgs = ["ffmpeg", "python311", "python311Packages.pip", "deno", "nodejs", "gi
 [phases.build]
 cmds = [
   "pip install --no-cache-dir -r requirements.txt",
+  "echo '=== Runtime Diagnostics ==='",
+  "which deno || echo 'deno not found'",
+  "which node || echo 'node not found'",
+  "which ffmpeg || echo 'ffmpeg not found'",
+  "deno --version || echo 'deno version check failed'",
+  "node --version || echo 'node version check failed'",
   "python -c \"import shutil; print('PATH deno=', shutil.which('deno')); print('PATH node=', shutil.which('node'))\"",
-  "python -c \"from yt_dlp.dependencies import yt_dlp_ejs; print('yt_dlp_ejs installed=', bool(yt_dlp_ejs))\""
+  "python -c \"from yt_dlp.dependencies import yt_dlp_ejs; print('yt_dlp_ejs installed=', bool(yt_dlp_ejs))\"",
+  "echo '========================='"
 ]
 
 [phases.deploy]

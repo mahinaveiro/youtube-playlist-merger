@@ -38,6 +38,27 @@ jobs: dict[str, dict] = {}
 log = logging.getLogger("ultimate_playlist_merger")
 
 
+@app.on_event("startup")
+async def startup_diagnostics():
+    """Log runtime paths and yt-dlp-ejs availability on startup."""
+    deno = shutil.which("deno")
+    node = shutil.which("node")
+    ffmpeg = shutil.which("ffmpeg")
+    
+    log.info("=== Startup Diagnostics ===")
+    log.info(f"deno: {deno or 'NOT FOUND'}")
+    log.info(f"node: {node or 'NOT FOUND'}")
+    log.info(f"ffmpeg: {ffmpeg or 'NOT FOUND'}")
+    
+    try:
+        from yt_dlp.dependencies import yt_dlp_ejs
+        log.info(f"yt-dlp-ejs: {'installed' if yt_dlp_ejs else 'NOT installed'}")
+    except ImportError:
+        log.warning("yt-dlp-ejs: import failed")
+    
+    log.info("===========================")
+
+
 def _strip_ansi(text: str) -> str:
     return re.sub(r"\x1b\[[0-9;:]*m", "", text)
 
@@ -123,6 +144,31 @@ def process_playlist(job_id: str, url: str) -> None:
     # js_runtimes + yt-dlp-ejs (requirements.txt) are required for YouTube n/sig challenges.
     # With cookies, only clients with SUPPORTS_COOKIES are used — ios/android are skipped by yt-dlp.
     # Do not use "mweb" here: it often requires a GVS PO Token for HTTPS formats (see PO-Token-Guide).
+    
+    # Find deno/node executables (Runway/Nixpacks puts them on PATH)
+    deno_path = shutil.which("deno")
+    node_path = shutil.which("node")
+    
+    js_runtimes = {}
+    if deno_path:
+        js_runtimes["deno"] = {"executable": deno_path}
+        log.info(f"Using deno runtime at: {deno_path}")
+    if node_path:
+        js_runtimes["node"] = {"executable": node_path}
+        log.info(f"Using node runtime at: {node_path}")
+    
+    # Fallback: if no JS runtime found, log warning but continue (will fail on protected videos)
+    if not js_runtimes:
+        log.warning("No JavaScript runtime (deno/node) found on PATH. YouTube signature challenges will fail.")
+        # Try without js_runtimes - yt-dlp might auto-detect
+        js_runtimes = None
+    
+    # Check if cookies file exists and is readable
+    cookies_path = BASE_DIR / "cookies.txt"
+    if not cookies_path.is_file():
+        log.warning(f"cookies.txt not found at {cookies_path}. Some videos may be unavailable.")
+        cookies_path = None
+    
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": f"{job_dir.as_posix()}/%(playlist_index)02d - %(title)s.%(ext)s",
@@ -133,21 +179,27 @@ def process_playlist(job_id: str, url: str) -> None:
                 "preferredquality": "320",
             },
         ],
-        # Absolute path so cookies load even if process cwd is not the app directory.
-        "cookiefile": str(BASE_DIR / "cookies.txt"),
-        "js_runtimes": {"deno": {}, "node": {}},
-        "remote_components": {"ejs:github"},
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["web", "web_embedded", "tv"],
-            },
-        },
         "quiet": False,
         "extractaudio": True,
         "ignoreerrors": True,
         "yes_playlist": True,
         "no_warnings": False,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["web", "web_embedded", "tv"],
+            },
+        },
     }
+    
+    # Add optional configs only if available
+    if cookies_path:
+        ydl_opts["cookiefile"] = str(cookies_path)
+    
+    if js_runtimes:
+        ydl_opts["js_runtimes"] = js_runtimes
+        ydl_opts["remote_components"] = {"ejs:github"}
+    else:
+        log.warning("Proceeding without JS runtime - may fail on signature-protected videos")
 
     try:
         job_dir.mkdir(parents=True, exist_ok=True)
