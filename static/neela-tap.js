@@ -309,16 +309,30 @@
     gameState.score = 0;
     gameState.noteY = gameState.gameHeight / 2 - NOTE_SIZE / 2;
     gameState.noteVelocity = 0;
+    gameState.currentRotation = 0;
+    gameState.gameStartTimestamp = null; // Will be set in first gameLoop frame
     
     clearPipes();
     clearParticles();
     
     gameState.pipeSpeed = PIPE_SPEED_BASE;
-    gameState.lastPipeTimestamp = 0; 
+    gameState.lastPipeTimestamp = 0;
+    
+    // CRITICAL FIX: Position the note immediately before starting game loop
+    // This ensures getBoundingClientRect() returns valid coordinates
+    const initialX = gameState.gameWidth * 0.2;
+    elements.note.style.transform = `translate(${initialX}px, ${gameState.noteY}px) rotate(0deg)`;
+    
+    // Force a reflow to ensure the note is rendered at correct position
+    void elements.note.offsetHeight;
     
     updateScoreDisplay();
     attachGameInputs();
-    gameState.animationId = requestAnimationFrame(gameLoop);
+    
+    // Delay first frame slightly to ensure DOM is fully updated
+    requestAnimationFrame(() => {
+      gameState.animationId = requestAnimationFrame(gameLoop);
+    });
   }
 
   function restartGame() {
@@ -371,6 +385,10 @@
   function gameLoop(timestamp) {
     if (!gameState.isPlaying || gameState.isPaused) return;
 
+    if (!gameState.gameStartTimestamp) {
+      gameState.gameStartTimestamp = timestamp;
+    }
+    
     if (!gameState.lastPipeTimestamp) gameState.lastPipeTimestamp = timestamp;
 
     updateNote(timestamp);
@@ -456,7 +474,11 @@
   }
 
   function updatePipes(timestamp) {
-    if (timestamp - gameState.lastPipeTimestamp >= PIPE_SPAWN_INTERVAL) {
+    // Grace period: Don't spawn pipes in the first 500ms to let player get ready
+    const gracePeriod = 500;
+    const timeSinceStart = timestamp - (gameState.gameStartTimestamp || timestamp);
+    
+    if (timeSinceStart > gracePeriod && timestamp - gameState.lastPipeTimestamp >= PIPE_SPAWN_INTERVAL) {
       spawnPipe();
       gameState.lastPipeTimestamp = timestamp;
     }
@@ -552,12 +574,19 @@
   }
 
   function checkCollisions() {
+    // Boundary check
     if (gameState.noteY < 0 || gameState.noteY + NOTE_SIZE > gameState.gameHeight) {
       triggerGameOver();
       return;
     }
 
     const noteRect = elements.noteInner.getBoundingClientRect();
+    
+    // CRITICAL FIX: Safety check - ensure note has valid dimensions before collision detection
+    // This prevents false collisions when note isn't fully rendered yet
+    if (noteRect.width === 0 || noteRect.height === 0) {
+      return; // Skip collision check this frame
+    }
     
     // Slight tolerance to make bounding box feel fair vs visual art bounds
     const shrink = 4;
