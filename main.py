@@ -86,22 +86,25 @@ def process_playlist(job_id: str, url: str) -> None:
                 j["error"] = error
 
     ydl_opts = {
-        "cookiefile": "cookies.txt",
-        "js-runtimes": "deno",
-        "extractor_args": {"youtube": {"player_client": ["ios", "web", "android"]}},
-        "outtmpl": str(job_dir / "%(playlist_index)03d.%(ext)s"),
-        "outtmpl_na_placeholder": "001",
-        "noplaylist_reverse": True,
-        "format": "bestaudio/best[height<=480]/bestaudio/best",
+        "format": "bestaudio/best",
+        "outtmpl": f"{job_dir.as_posix()}/%(playlist_index)02d - %(title)s.%(ext)s",
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
+                "preferredquality": "320",
             },
         ],
-        "postprocessor_args": {
-            "ffmpeg": ["-c:a", "libmp3lame", "-b:a", "320k"],
+        "cookiefile": "cookies.txt",
+        "js-runtimes": "deno",
+        "extractor_args": {
+            "youtube": {"player_client": ["ios", "web", "android", "web_embedded"]},
         },
+        "quiet": False,
+        "extractaudio": True,
+        "ignoreerrors": True,
+        "yes_playlist": True,
+        "no_warnings": False,
     }
 
     try:
