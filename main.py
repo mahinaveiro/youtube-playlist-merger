@@ -116,18 +116,17 @@ async def startup_diagnostics():
         except Exception:
             log.info("bgutil-ytdlp-pot-provider: unable to verify (check manually)")
     
-    # Test bgutil provider connectivity
-    bgutil_url = "http://bgutil-provider.railway.internal:4416"
+    # Test bgutil provider connectivity (optional feature)
+    bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL", "http://bgutil-provider.railway.internal:4416")
     try:
         import urllib.request
         with urllib.request.urlopen(f"{bgutil_url}/health", timeout=5) as response:
             if response.status == 200:
-                log.info(f"bgutil provider: CONNECTED at {bgutil_url}")
+                log.info(f"✓ bgutil provider: CONNECTED at {bgutil_url}")
             else:
-                log.warning(f"bgutil provider: responded with status {response.status}")
-    except Exception as e:
-        log.warning(f"bgutil provider: NOT reachable at {bgutil_url} - {e}")
-        log.warning("Make sure bgutil-provider service is running on Railway")
+                log.info(f"bgutil provider responded with status {response.status}")
+    except Exception:
+        log.info(f"bgutil provider: not available (optional - app will use cookies only)")
     
     log.info("===========================")
 
@@ -275,33 +274,20 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST")
         if age_days > 30:
             log.warning(f"cookies.txt is {age_days:.0f} days old. Consider refreshing for better reliability.")
     
-    # bgutil PO Token provider URL (Railway private network)
-    # Can be overridden with BGUTIL_PROVIDER_URL environment variable
-    # Try multiple connection methods for Railway
-    bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL")
+    # bgutil PO Token provider (optional - enhances bot detection bypass)
+    # If not available, app will work with cookies.txt alone
+    bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL", "http://bgutil-provider.railway.internal:4416")
     
-    if not bgutil_url:
-        # Try different Railway private networking patterns
-        possible_urls = [
-            "http://bgutil-provider.railway.internal:4416",
-            "http://bgutil-provider:4416",  # Sometimes Railway uses short names
-        ]
-        bgutil_url = possible_urls[0]  # Default to first
-        log.info(f"Trying bgutil URLs: {possible_urls}")
-    
-    log.info(f"bgutil provider URL: {bgutil_url}")
-    
-    # Check if bgutil is reachable (non-blocking)
+    # Only add bgutil config if it's actually reachable
     bgutil_available = False
     try:
         import urllib.request
         with urllib.request.urlopen(f"{bgutil_url}/health", timeout=2) as response:
             if response.status == 200:
                 bgutil_available = True
-                log.info("bgutil provider: AVAILABLE")
+                log.info(f"✓ bgutil provider connected at {bgutil_url}")
     except Exception as e:
-        log.warning(f"bgutil provider not reachable: {e}")
-        log.warning("Continuing without bgutil - will rely on cookies only")
+        log.info(f"bgutil provider not available (will use cookies only): {e}")
     
     ydl_opts = {
         "format": "bestaudio/best",
@@ -323,11 +309,14 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST")
             "youtube": {
                 "player_client": ["web", "web_embedded", "tv"],
             },
-            "youtubepot-bgutil:http": {
-                "base_url": bgutil_url,
-            },
         },
     }
+    
+    # Only add bgutil config if service is reachable
+    if bgutil_available:
+        ydl_opts["extractor_args"]["youtubepot-bgutil:http"] = {
+            "base_url": bgutil_url,
+        }
     
     # Add optional configs only if available
     if cookies_exist:
