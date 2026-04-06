@@ -41,14 +41,33 @@ log = logging.getLogger("ultimate_playlist_merger")
 @app.on_event("startup")
 async def startup_diagnostics():
     """Log runtime paths and yt-dlp-ejs availability on startup."""
+    import os
+    
     deno = shutil.which("deno")
     node = shutil.which("node")
     ffmpeg = shutil.which("ffmpeg")
     
     log.info("=== Startup Diagnostics ===")
-    log.info(f"deno: {deno or 'NOT FOUND'}")
-    log.info(f"node: {node or 'NOT FOUND'}")
-    log.info(f"ffmpeg: {ffmpeg or 'NOT FOUND'}")
+    log.info(f"deno (PATH): {deno or 'NOT FOUND'}")
+    log.info(f"node (PATH): {node or 'NOT FOUND'}")
+    log.info(f"ffmpeg (PATH): {ffmpeg or 'NOT FOUND'}")
+    
+    # Search Nix store if not on PATH
+    try:
+        nix_store = Path("/nix/store")
+        if not deno and nix_store.exists():
+            nix_deno = list(nix_store.glob("*-deno-*/bin/deno"))
+            if nix_deno:
+                log.info(f"deno (Nix store): {nix_deno[0]}")
+        
+        if not node and nix_store.exists():
+            nix_node = list(nix_store.glob("*-nodejs-*/bin/node"))
+            if nix_node:
+                log.info(f"node (Nix store): {nix_node[0]}")
+    except (OSError, PermissionError) as e:
+        log.warning(f"Could not search Nix store: {e}")
+    
+    log.info(f"PATH: {os.environ.get('PATH', 'NOT SET')[:200]}...")  # Truncate long PATH
     
     try:
         from yt_dlp.dependencies import yt_dlp_ejs
@@ -145,9 +164,34 @@ def process_playlist(job_id: str, url: str) -> None:
     # With cookies, only clients with SUPPORTS_COOKIES are used — ios/android are skipped by yt-dlp.
     # Do not use "mweb" here: it often requires a GVS PO Token for HTTPS formats (see PO-Token-Guide).
     
-    # Find deno/node executables (Runway/Nixpacks puts them on PATH)
+    # Find deno/node executables - try PATH first, then common Nix store locations
     deno_path = shutil.which("deno")
     node_path = shutil.which("node")
+    
+    # Fallback: search common Nix store paths (Runway/Nixpacks)
+    if not deno_path:
+        try:
+            nix_store = Path("/nix/store")
+            if nix_store.exists():
+                for candidate in nix_store.glob("*-deno-*/bin/deno"):
+                    if candidate.is_file():
+                        deno_path = str(candidate)
+                        log.info(f"Found deno in Nix store: {deno_path}")
+                        break
+        except (OSError, PermissionError) as e:
+            log.warning(f"Could not search Nix store for deno: {e}")
+    
+    if not node_path:
+        try:
+            nix_store = Path("/nix/store")
+            if nix_store.exists():
+                for candidate in nix_store.glob("*-nodejs-*/bin/node"):
+                    if candidate.is_file():
+                        node_path = str(candidate)
+                        log.info(f"Found node in Nix store: {node_path}")
+                        break
+        except (OSError, PermissionError) as e:
+            log.warning(f"Could not search Nix store for node: {e}")
     
     js_runtimes = {}
     if deno_path:
