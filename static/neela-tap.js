@@ -229,7 +229,7 @@
     text1.style.top = '35%';
     text1.style.left = '100%';
     if (isMobile) {
-      text1.style.fontSize = '60px'; // Smaller on mobile
+      text1.style.fontSize = '40px'; // Much smaller on mobile
     }
     elements.canvas.appendChild(text1);
     gameState.bgTexts.push({ element: text1, x: 100, speed: 0.15 });
@@ -241,7 +241,7 @@
     text2.style.top = '65%';
     text2.style.left = '100%';
     if (isMobile) {
-      text2.style.fontSize = '60px'; // Smaller on mobile
+      text2.style.fontSize = '40px'; // Much smaller on mobile
     }
     elements.canvas.appendChild(text2);
     gameState.bgTexts.push({ element: text2, x: 100, speed: 0.18 });
