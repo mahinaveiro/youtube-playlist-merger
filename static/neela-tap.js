@@ -190,6 +190,10 @@
           </svg>
           Your mix is ready! Tap here to get it
         </div>
+        
+        <div class="neela-countdown" id="neela-countdown">
+          <div class="neela-countdown-number" id="neela-countdown-number">3</div>
+        </div>
       </div>
     `;
 
@@ -204,6 +208,8 @@
       finalScore: document.getElementById('neela-final-score'),
       finalBest: document.getElementById('neela-final-best'),
       readyBanner: document.getElementById('neela-ready-banner'),
+      countdown: document.getElementById('neela-countdown'),
+      countdownNumber: document.getElementById('neela-countdown-number'),
       tapStart: document.getElementById('neela-tap-start'),
       quitStart: document.getElementById('neela-quit-start'),
       playAgain: document.getElementById('neela-play-again'),
@@ -298,19 +304,62 @@
   }
 
   function startGame() {
-    initAudio(); 
+    initAudio();
+    
+    // Show countdown overlay
     elements.startScreen.style.display = 'none';
+    elements.countdown.classList.add('active');
     elements.note.style.display = 'block';
+    elements.scoreDisplay.style.display = 'none'; // Hide score during countdown
+    
+    // Position note immediately
+    gameState.noteY = gameState.gameHeight / 2 - NOTE_SIZE / 2;
+    gameState.noteVelocity = 0;
+    gameState.currentRotation = 0;
+    const initialX = gameState.gameWidth * 0.2;
+    elements.note.style.transform = `translate(${initialX}px, ${gameState.noteY}px) rotate(0deg)`;
+    void elements.note.offsetHeight;
+    
+    // Countdown sequence: 3... 2... 1... GO!
+    let count = 3;
+    elements.countdownNumber.textContent = count;
+    elements.countdownNumber.className = 'neela-countdown-number';
+    void elements.countdownNumber.offsetWidth; // Force reflow
+    elements.countdownNumber.classList.add('neela-countdown-animate');
+    
+    playOscillator(440, 'sine', 0.1, 0.3); // Beep sound
+    
+    const countdownInterval = setInterval(() => {
+      count--;
+      
+      if (count > 0) {
+        elements.countdownNumber.textContent = count;
+        elements.countdownNumber.className = 'neela-countdown-number';
+        void elements.countdownNumber.offsetWidth;
+        elements.countdownNumber.classList.add('neela-countdown-animate');
+        playOscillator(440, 'sine', 0.1, 0.3);
+      } else if (count === 0) {
+        elements.countdownNumber.textContent = 'GO!';
+        elements.countdownNumber.className = 'neela-countdown-number neela-countdown-go';
+        void elements.countdownNumber.offsetWidth;
+        elements.countdownNumber.classList.add('neela-countdown-animate');
+        playOscillator(660, 'sine', 0.15, 0.4); // Higher pitch for GO
+      } else {
+        clearInterval(countdownInterval);
+        elements.countdown.classList.remove('active');
+        actuallyStartGame();
+      }
+    }, 1000);
+  }
+  
+  function actuallyStartGame() {
     elements.scoreDisplay.style.display = 'block';
     elements.gameOver.classList.remove('active');
     
     gameState.isPlaying = true;
     gameState.isPaused = false;
     gameState.score = 0;
-    gameState.noteY = gameState.gameHeight / 2 - NOTE_SIZE / 2;
-    gameState.noteVelocity = 0;
-    gameState.currentRotation = 0;
-    gameState.gameStartTimestamp = null; // Will be set in first gameLoop frame
+    gameState.gameStartTimestamp = null;
     
     clearPipes();
     clearParticles();
@@ -318,21 +367,10 @@
     gameState.pipeSpeed = PIPE_SPEED_BASE;
     gameState.lastPipeTimestamp = 0;
     
-    // CRITICAL FIX: Position the note immediately before starting game loop
-    // This ensures getBoundingClientRect() returns valid coordinates
-    const initialX = gameState.gameWidth * 0.2;
-    elements.note.style.transform = `translate(${initialX}px, ${gameState.noteY}px) rotate(0deg)`;
-    
-    // Force a reflow to ensure the note is rendered at correct position
-    void elements.note.offsetHeight;
-    
     updateScoreDisplay();
     attachGameInputs();
     
-    // Delay first frame slightly to ensure DOM is fully updated
-    requestAnimationFrame(() => {
-      gameState.animationId = requestAnimationFrame(gameLoop);
-    });
+    gameState.animationId = requestAnimationFrame(gameLoop);
   }
 
   function restartGame() {
