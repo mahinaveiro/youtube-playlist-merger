@@ -92,7 +92,7 @@ def process_playlist(job_id: str, url: str) -> None:
         "outtmpl": str(job_dir / "%(playlist_index)03d.%(ext)s"),
         "outtmpl_na_placeholder": "001",
         "noplaylist_reverse": True,
-        "format": "bestaudio/best",
+        "format": "bestaudio/best[height<=480]/bestaudio/best",
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
