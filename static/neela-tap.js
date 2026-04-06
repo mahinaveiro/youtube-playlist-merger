@@ -123,8 +123,37 @@
   
   function updateMuteButtonUI() {
     if (!elements.muteBtn) return;
-    elements.muteBtn.textContent = isMusicMuted ? '🔇' : '🔊';
-    elements.muteBtn.title = isMusicMuted ? 'Unmute Music' : 'Mute Music';
+    
+    const soundWaves = elements.muteBtn.querySelectorAll('.neela-sound-waves');
+    
+    if (isMusicMuted) {
+      // Hide sound waves when muted
+      soundWaves.forEach(wave => wave.style.display = 'none');
+      elements.muteBtn.title = 'Unmute Music';
+      
+      // Add X line for muted state
+      if (!elements.muteBtn.querySelector('.neela-mute-x')) {
+        const svg = elements.muteBtn.querySelector('svg');
+        const muteLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        muteLine.setAttribute('class', 'neela-mute-x');
+        muteLine.setAttribute('x1', '1');
+        muteLine.setAttribute('y1', '1');
+        muteLine.setAttribute('x2', '23');
+        muteLine.setAttribute('y2', '23');
+        muteLine.setAttribute('stroke', 'currentColor');
+        muteLine.setAttribute('stroke-width', '2');
+        muteLine.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(muteLine);
+      }
+    } else {
+      // Show sound waves when unmuted
+      soundWaves.forEach(wave => wave.style.display = 'block');
+      elements.muteBtn.title = 'Mute Music';
+      
+      // Remove X line
+      const muteLine = elements.muteBtn.querySelector('.neela-mute-x');
+      if (muteLine) muteLine.remove();
+    }
   }
 
   function playOscillator(freq, type, duration, vol, rampToFreq=null, rampDuration=0) {
@@ -274,7 +303,13 @@
           <div class="neela-countdown-number" id="neela-countdown-number">3</div>
         </div>
         
-        <button class="neela-mute-btn" id="neela-mute-btn" title="Mute Music">🔊</button>
+        <button class="neela-mute-btn" id="neela-mute-btn" title="Mute Music">
+          <svg class="neela-mute-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path class="neela-sound-waves" d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path class="neela-sound-waves" d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          </svg>
+        </button>
       </div>
     `;
 

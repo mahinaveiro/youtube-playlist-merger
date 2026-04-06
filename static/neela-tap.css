@@ -444,13 +444,13 @@
   border: 2px solid rgba(139, 92, 246, 0.3);
   border-radius: 8px;
   color: #a78bfa;
-  font-size: 24px;
   cursor: pointer;
   transition: all 0.2s ease;
   z-index: 20;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 10px;
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
@@ -465,6 +465,16 @@
 
 .neela-mute-btn:active {
   transform: scale(0.95);
+}
+
+.neela-mute-icon {
+  width: 100%;
+  height: 100%;
+  color: #a78bfa;
+}
+
+.neela-sound-waves {
+  transition: opacity 0.2s ease;
 }
 
 @keyframes neela-countdown-pop {
