@@ -122,6 +122,7 @@ def process_playlist(job_id: str, url: str) -> None:
 
     # js_runtimes + yt-dlp-ejs (requirements.txt) are required for YouTube n/sig challenges.
     # With cookies, only clients with SUPPORTS_COOKIES are used — ios/android are skipped by yt-dlp.
+    # Do not use "mweb" here: it often requires a GVS PO Token for HTTPS formats (see PO-Token-Guide).
     ydl_opts = {
         "format": "bestaudio/best",
         "outtmpl": f"{job_dir.as_posix()}/%(playlist_index)02d - %(title)s.%(ext)s",
@@ -132,12 +133,13 @@ def process_playlist(job_id: str, url: str) -> None:
                 "preferredquality": "320",
             },
         ],
-        "cookiefile": "cookies.txt",
-        "js_runtimes": {"deno": {}},
+        # Absolute path so cookies load even if process cwd is not the app directory.
+        "cookiefile": str(BASE_DIR / "cookies.txt"),
+        "js_runtimes": {"deno": {}, "node": {}},
         "remote_components": {"ejs:github"},
         "extractor_args": {
             "youtube": {
-                "player_client": ["web", "web_embedded", "mweb", "tv"],
+                "player_client": ["web", "web_embedded", "tv"],
             },
         },
         "quiet": False,

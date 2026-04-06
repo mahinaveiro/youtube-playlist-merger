@@ -1,9 +1,11 @@
 [phases.setup]
-nixPkgs = ["ffmpeg", "python311", "python311Packages.pip", "deno", "git"]
+nixPkgs = ["ffmpeg", "python311", "python311Packages.pip", "deno", "nodejs", "git"]
 
 [phases.build]
 cmds = [
-  "pip install --no-cache-dir -r requirements.txt"
+  "pip install --no-cache-dir -r requirements.txt",
+  "python -c \"import shutil; print('PATH deno=', shutil.which('deno')); print('PATH node=', shutil.which('node'))\"",
+  "python -c \"from yt_dlp.dependencies import yt_dlp_ejs; print('yt_dlp_ejs installed=', bool(yt_dlp_ejs))\""
 ]
 
 [phases.deploy]
