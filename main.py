@@ -485,7 +485,7 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST",
 class CreateJobBody(BaseModel):
     url: str = Field(..., min_length=4, max_length=2048)
     filename: str = Field(default="ULTIMATE_PLAYLIST", min_length=1, max_length=100)
-    quality: str = Field(default="320", pattern="^(320|128)$")
+    quality: str = Field(default="320k", pattern="^(320k|128k)$")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -521,7 +521,10 @@ async def create_job(body: CreateJobBody, background_tasks: BackgroundTasks):
             "created_at": created_at.isoformat(),
         }
 
-    background_tasks.add_task(process_playlist, job_id, raw, safe_filename, body.quality)
+    # Strip 'k' suffix from quality (frontend sends "320k", FFmpeg expects "320")
+    quality_value = body.quality.rstrip('k')
+
+    background_tasks.add_task(process_playlist, job_id, raw, safe_filename, quality_value)
     background_tasks.add_task(schedule_job_cleanup, job_id, 1)  # Auto-delete after 1 hour
     
     return {"job_id": job_id}
