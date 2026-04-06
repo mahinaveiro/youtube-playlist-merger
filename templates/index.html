@@ -182,7 +182,7 @@
       </section>
 
       <footer class="mt-auto pt-12 text-center">
-        <p class="mt-3 text-xs text-zinc-500">Created by <span class="text-emerald-400/90 font-medium">Mahin</span></p>
+        <p class="mt-3 text-xs text-zinc-500">Created by <span id="footer-mahin" class="text-emerald-400/90 font-medium cursor-pointer">Mahin</span></p>
       </footer>
     </main>
 
@@ -273,8 +273,10 @@
               window.NeelaTap.hideGame();
               if (processingComplete) {
                 showSuccess();
-              } else {
+              } else if (jobId) {
                 showLoading();
+              } else {
+                showForm();
               }
             });
             
@@ -486,6 +488,13 @@
           urlInput.focus();
         });
         btnCleanup.addEventListener("click", cleanupJob);
+        
+        // Hidden gateway to the game
+        $("footer-mahin").addEventListener("click", () => {
+          if (window.NeelaTap) {
+            window.NeelaTap.showGame();
+          }
+        });
 
         urlInput.addEventListener("keydown", (e) => {
           if (e.key === "Enter") createJob();

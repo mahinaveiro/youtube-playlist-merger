@@ -7,16 +7,101 @@
 (function () {
   'use strict';
 
-  const GRAVITY = 0.5;
-  const FLAP_STRENGTH = -9;
+  // --- Dynamic CSS Injection for requirements not perfectly matched in existing CSS ---
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes neela-wobble {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+    .neela-wobble-anim {
+      animation: neela-wobble 0.4s ease-in-out infinite;
+      transform-origin: center;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .neela-particle {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background-color: #a78bfa; /* Soft purple */
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 4;
+      opacity: 0.8;
+      transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+    }
+  `;
+  document.head.appendChild(style);
+
+  // --- Web Audio API Setup ---
+  let audioCtx = null;
+  
+  function initAudio() {
+    if (!audioCtx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        audioCtx = new AudioContext();
+      }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  function playOscillator(freq, type, duration, vol, rampToFreq=null, rampDuration=0) {
+    if (!audioCtx) return;
+    try {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      if (rampToFreq && rampDuration > 0) {
+        osc.frequency.linearRampToValueAtTime(rampToFreq, audioCtx.currentTime + rampDuration);
+      }
+      
+      gainNode.gain.setValueAtTime(vol, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+      
+      osc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    } catch(e) {}
+  }
+
+  function playFlapSound() {
+    playOscillator(520, 'sine', 0.08, 0.3);
+  }
+
+  function playScoreSound() {
+    if (!audioCtx) return;
+    try {
+      playOscillator(660, 'sine', 0.06, 0.2);
+      setTimeout(() => {
+        playOscillator(880, 'sine', 0.06, 0.2);
+      }, 60);
+    } catch(e) {}
+  }
+
+  function playGameOverSound() {
+    playOscillator(440, 'triangle', 0.6, 0.4, 150, 0.6);
+  }
+
+  // --- Constants & Config ---
+  const GRAVITY = 0.45;
+  const FLAP_STRENGTH = -7.5;
+  const TERMINAL_VELOCITY = 9;
   const PIPE_SPEED_BASE = 2.5;
-  const PIPE_GAP = 200;
-  const PIPE_WIDTH = 60;
-  const PIPE_SPAWN_INTERVAL = 2000;
+  const MAX_PIPE_SPEED = 5.0;
+  const PIPE_WIDTH = 52;
+  const PIPE_SPAWN_INTERVAL = 2000; // ms
   const NOTE_SIZE = 40;
-  const SPEED_INCREASE_PER_SCORE = 0.1;
   const HIGH_SCORE_KEY = 'neela_tap_highscore';
-  const SAFE_MARGIN = 50; // Safe margin from top/bottom
 
   let gameState = {
     isPlaying: false,
@@ -26,12 +111,14 @@
     noteY: 0,
     noteVelocity: 0,
     pipes: [],
-    lastPipeTime: 0,
+    lastPipeTimestamp: 0,
     pipeSpeed: PIPE_SPEED_BASE,
     gameWidth: 0,
     gameHeight: 0,
     animationId: null,
     bgTexts: [],
+    particles: [],
+    lastParticleFrame: 0,
   };
 
   let elements = {};
@@ -73,10 +160,13 @@
         </div>
         
         <div class="neela-score" id="neela-score" style="display: none;">0</div>
+        
         <div class="neela-note" id="neela-note" style="display: none;">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="100%" height="100%">
-            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-          </svg>
+          <div class="neela-wobble-anim" id="neela-note-inner" style="transform-origin: center;">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="100%" height="100%">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+            </svg>
+          </div>
         </div>
         
         <div class="neela-game-over" id="neela-game-over">
@@ -108,6 +198,7 @@
       canvas: document.getElementById('neela-canvas'),
       startScreen: document.getElementById('neela-start-screen'),
       note: document.getElementById('neela-note'),
+      noteInner: document.getElementById('neela-note-inner'),
       scoreDisplay: document.getElementById('neela-score'),
       gameOver: document.getElementById('neela-game-over'),
       finalScore: document.getElementById('neela-final-score'),
@@ -121,23 +212,15 @@
   }
 
   function createBackgroundTexts() {
-    // Create single scrolling text
     const text = document.createElement('div');
     text.className = 'neela-bg-text';
     text.textContent = 'Codanela Production';
     text.style.top = '50%';
     text.style.left = '100%';
     elements.canvas.appendChild(text);
-    gameState.bgTexts.push({
-      element: text,
-      x: 100,
-      speed: 0.2,
-    });
+    gameState.bgTexts.push({ element: text, x: 100, speed: 0.2 });
 
-    // Create clouds
     createClouds();
-    
-    // Create moon
     createMoon();
   }
 
@@ -147,7 +230,6 @@
       { top: 25, left: 70, size: 80 },
       { top: 10, left: 50, size: 50 },
     ];
-    
     cloudPositions.forEach((pos, index) => {
       const cloud = document.createElement('div');
       cloud.className = 'neela-cloud';
@@ -156,13 +238,7 @@
       cloud.style.width = `${pos.size}px`;
       cloud.style.height = `${pos.size * 0.6}px`;
       elements.canvas.appendChild(cloud);
-      
-      gameState.bgTexts.push({
-        element: cloud,
-        x: pos.left,
-        speed: 0.05 + index * 0.02,
-        isCloud: true,
-      });
+      gameState.bgTexts.push({ element: cloud, x: pos.left, speed: 0.05 + index * 0.02, isCloud: true });
     });
   }
 
@@ -181,8 +257,26 @@
     elements.quitGame.addEventListener('click', quitGame);
     elements.readyBanner.addEventListener('click', handleMixReady);
     
-    elements.canvas.addEventListener('click', handleTap);
-    elements.canvas.addEventListener('touchstart', handleTap);
+    // Core game inputs
+    document.addEventListener('keydown', (e) => {
+      if (gameState.isPlaying && !gameState.isPaused && e.code === 'Space') {
+        e.preventDefault();
+        jump();
+      }
+    }); // Make sure this persists globally before start
+    
+    elements.canvas.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.neela-start-screen, .neela-game-over')) return;
+      if (gameState.isPlaying && !gameState.isPaused) jump();
+    });
+    
+    elements.canvas.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.neela-start-screen, .neela-game-over, .neela-quit-btn')) return;
+      if (gameState.isPlaying && !gameState.isPaused) {
+        e.preventDefault();
+        jump();
+      }
+    }, {passive: false});
     
     window.addEventListener('resize', handleResize);
     handleResize();
@@ -193,33 +287,36 @@
     gameState.gameHeight = elements.canvas.clientHeight;
   }
 
-  function handleTap(e) {
-    if (!gameState.isPlaying || gameState.isPaused) return;
-    e.preventDefault();
+  function jump() {
+    initAudio();
     gameState.noteVelocity = FLAP_STRENGTH;
+    playFlapSound();
   }
 
   function startGame() {
+    initAudio(); 
     elements.startScreen.style.display = 'none';
     elements.note.style.display = 'block';
     elements.scoreDisplay.style.display = 'block';
+    elements.gameOver.classList.remove('active');
     
     gameState.isPlaying = true;
     gameState.isPaused = false;
     gameState.score = 0;
     gameState.noteY = gameState.gameHeight / 2 - NOTE_SIZE / 2;
     gameState.noteVelocity = 0;
-    gameState.pipes = [];
-    gameState.lastPipeTime = Date.now(); // Start timer now
+    
+    clearPipes();
+    clearParticles();
+    
     gameState.pipeSpeed = PIPE_SPEED_BASE;
+    gameState.lastPipeTimestamp = 0; 
     
     updateScoreDisplay();
-    gameLoop();
+    gameState.animationId = requestAnimationFrame(gameLoop);
   }
 
   function restartGame() {
-    elements.gameOver.classList.remove('active');
-    clearPipes();
     startGame();
   }
 
@@ -235,12 +332,12 @@
       gameState.animationId = null;
     }
     clearPipes();
+    clearParticles();
     elements.note.style.display = 'none';
     elements.scoreDisplay.style.display = 'none';
     elements.gameOver.classList.remove('active');
     elements.startScreen.style.display = 'flex';
     
-    // Update high score display on start screen
     const highScoreEl = elements.startScreen.querySelector('.neela-high-score');
     if (gameState.highScore > 0) {
       if (highScoreEl) {
@@ -264,99 +361,160 @@
     if (onMixReady) onMixReady();
   }
 
-  function gameLoop() {
+  // Main Loop
+  function gameLoop(timestamp) {
     if (!gameState.isPlaying || gameState.isPaused) return;
 
-    updateNote();
-    updatePipes();
+    if (!gameState.lastPipeTimestamp) gameState.lastPipeTimestamp = timestamp;
+
+    updateNote(timestamp);
+    updatePipes(timestamp);
+    updateParticles();
     updateBackgroundTexts();
     checkCollisions();
 
-    gameState.animationId = requestAnimationFrame(gameLoop);
+    if (gameState.isPlaying) {
+      gameState.animationId = requestAnimationFrame(gameLoop);
+    }
   }
 
-  function updateNote() {
+  function lerp(start, end, amt) {
+    return (1 - amt) * start + amt * end;
+  }
+
+  function updateNote(timestamp) {
     gameState.noteVelocity += GRAVITY;
+    if (gameState.noteVelocity > TERMINAL_VELOCITY) {
+      gameState.noteVelocity = TERMINAL_VELOCITY;
+    }
     gameState.noteY += gameState.noteVelocity;
 
-    // Boundaries - with safe margin
-    if (gameState.noteY < 0) {
-      endGame();
-      return;
+    const currentX = gameState.gameWidth * 0.2;
+    
+    let targetRotation = 0;
+    if (gameState.noteVelocity < 0) {
+      targetRotation = -20;
+    } else {
+      targetRotation = Math.min(30, (gameState.noteVelocity / TERMINAL_VELOCITY) * 30);
     }
-    if (gameState.noteY + NOTE_SIZE > gameState.gameHeight) {
-      endGame();
-      return;
-    }
+    
+    if (gameState.currentRotation === undefined) gameState.currentRotation = 0;
+    gameState.currentRotation = lerp(gameState.currentRotation, targetRotation, 0.2);
 
-    elements.note.style.transform = `translate(${gameState.gameWidth * 0.2}px, ${gameState.noteY}px)`;
+    elements.note.style.transform = `translate(${currentX}px, ${gameState.noteY}px) rotate(${gameState.currentRotation}deg)`;
+
+    gameState.lastParticleFrame++;
+    if (gameState.lastParticleFrame > 5) {
+      gameState.lastParticleFrame = 0;
+      spawnParticle(currentX + NOTE_SIZE/2, gameState.noteY + NOTE_SIZE/2);
+    }
   }
 
-  function updatePipes() {
-    const now = Date.now();
+  function spawnParticle(x, y) {
+    if (gameState.particles.length > 15) {
+      const p = gameState.particles.shift();
+      if (p && p.element && p.element.parentNode) p.element.remove();
+    }
     
-    // Spawn new pipe
-    if (now - gameState.lastPipeTime > PIPE_SPAWN_INTERVAL) {
+    const div = document.createElement('div');
+    div.className = 'neela-particle';
+    div.style.left = `${x - 3}px`; 
+    div.style.top = `${y - 3}px`;
+    elements.canvas.appendChild(div);
+    
+    void div.offsetWidth; // Force reflow
+    
+    div.style.transform = 'translateY(15px) scale(0)';
+    div.style.opacity = '0';
+    
+    // Store particle ref safely
+    const particleState = {
+      element: div,
+      createdAt: performance.now()
+    };
+    
+    gameState.particles.push(particleState);
+    
+    setTimeout(() => {
+      if (div && div.parentNode) div.remove();
+      const idx = gameState.particles.indexOf(particleState);
+      if (idx !== -1) gameState.particles.splice(idx, 1);
+    }, 500);
+  }
+
+  function clearParticles() {
+    gameState.particles.forEach(p => {
+      if (p && p.element && p.element.parentNode) p.element.remove();
+    });
+    gameState.particles = [];
+  }
+
+  function updatePipes(timestamp) {
+    if (timestamp - gameState.lastPipeTimestamp >= PIPE_SPAWN_INTERVAL) {
       spawnPipe();
-      gameState.lastPipeTime = now;
+      gameState.lastPipeTimestamp = timestamp;
     }
 
-    // Move pipes
-    gameState.pipes.forEach((pipe, index) => {
+    for (let i = gameState.pipes.length - 1; i >= 0; i--) {
+      const pipe = gameState.pipes[i];
       pipe.x -= gameState.pipeSpeed;
 
       pipe.topElement.style.transform = `translateX(${pipe.x}px)`;
       pipe.bottomElement.style.transform = `translateX(${pipe.x}px)`;
 
-      // Score when passing pipe
-      if (!pipe.scored && pipe.x + PIPE_WIDTH < gameState.gameWidth * 0.2) {
+      const noteX = gameState.gameWidth * 0.2 + NOTE_SIZE/2;
+      const pipeCenterX = pipe.x + PIPE_WIDTH/2;
+
+      if (!pipe.scored && noteX > pipeCenterX) {
         pipe.scored = true;
         gameState.score++;
         updateScoreDisplay();
+        playScoreSound();
         
-        // Increase difficulty
-        gameState.pipeSpeed = PIPE_SPEED_BASE + gameState.score * SPEED_INCREASE_PER_SCORE;
+        const bonus = Math.floor(gameState.score / 5) * 0.1;
+        gameState.pipeSpeed = Math.min(PIPE_SPEED_BASE + bonus, MAX_PIPE_SPEED);
       }
 
-      // Remove off-screen pipes
       if (pipe.x + PIPE_WIDTH < 0) {
-        pipe.topElement.remove();
-        pipe.bottomElement.remove();
-        gameState.pipes.splice(index, 1);
+        if (pipe.topElement.parentNode) pipe.topElement.remove();
+        if (pipe.bottomElement.parentNode) pipe.bottomElement.remove();
+        gameState.pipes.splice(i, 1);
       }
-    });
+    }
   }
 
   function spawnPipe() {
-    const minGapTop = SAFE_MARGIN + 50;
-    const maxGapTop = gameState.gameHeight - PIPE_GAP - SAFE_MARGIN - 50;
+    const isMobile = window.innerWidth <= 640;
+    const gapHeight = isMobile ? 160 : 180;
     
-    // Ensure valid range
-    if (maxGapTop <= minGapTop) {
-      return; // Screen too small, skip spawning
-    }
+    const minCenterY = gameState.gameHeight * 0.25;
+    const maxCenterY = gameState.gameHeight * 0.75;
+    const gapCenterY = Math.random() * (maxCenterY - minCenterY) + minCenterY;
     
-    const gapTop = Math.random() * (maxGapTop - minGapTop) + minGapTop;
+    const gapTop = gapCenterY - (gapHeight / 2);
+    const gapBottom = gapCenterY + (gapHeight / 2);
 
     const topPipe = document.createElement('div');
     topPipe.className = 'neela-pipe';
-    topPipe.style.top = '0';
+    topPipe.style.top = '0px';
     topPipe.style.height = `${gapTop}px`;
-    topPipe.style.left = `${gameState.gameWidth}px`;
+    topPipe.style.left = '0px';
+    topPipe.style.width = `${PIPE_WIDTH}px`;
+    topPipe.style.transform = `translateX(${gameState.gameWidth}px)`;
 
     const bottomPipe = document.createElement('div');
     bottomPipe.className = 'neela-pipe';
-    bottomPipe.style.top = `${gapTop + PIPE_GAP}px`;
-    bottomPipe.style.height = `${gameState.gameHeight - gapTop - PIPE_GAP}px`;
-    bottomPipe.style.left = `${gameState.gameWidth}px`;
+    bottomPipe.style.top = `${gapBottom}px`;
+    bottomPipe.style.height = `${gameState.gameHeight - gapBottom}px`;
+    bottomPipe.style.left = '0px';
+    bottomPipe.style.width = `${PIPE_WIDTH}px`;
+    bottomPipe.style.transform = `translateX(${gameState.gameWidth}px)`;
 
     elements.canvas.appendChild(topPipe);
     elements.canvas.appendChild(bottomPipe);
 
     gameState.pipes.push({
       x: gameState.gameWidth,
-      gapTop,
-      gapBottom: gapTop + PIPE_GAP,
       topElement: topPipe,
       bottomElement: bottomPipe,
       scored: false,
@@ -365,8 +523,8 @@
 
   function clearPipes() {
     gameState.pipes.forEach(pipe => {
-      pipe.topElement.remove();
-      pipe.bottomElement.remove();
+      if (pipe.topElement.parentNode) pipe.topElement.remove();
+      if (pipe.bottomElement.parentNode) pipe.bottomElement.remove();
     });
     gameState.pipes = [];
   }
@@ -374,61 +532,74 @@
   function updateBackgroundTexts() {
     gameState.bgTexts.forEach(text => {
       text.x -= text.speed;
-      
       if (text.isCloud) {
-        // Clouds wrap around
-        if (text.x < -10) {
-          text.x = 110;
-        }
+        if (text.x < -10) text.x = 110;
       } else {
-        // Text wraps around
-        if (text.x < -50) {
-          text.x = 150;
-        }
+        if (text.x < -50) text.x = 150;
       }
-      
       text.element.style.left = `${text.x}%`;
     });
   }
 
-  function checkCollisions() {
-    const noteX = gameState.gameWidth * 0.2;
-    const noteRight = noteX + NOTE_SIZE;
-    const noteBottom = gameState.noteY + NOTE_SIZE;
+  function updateParticles() {
+    // Mostly handled via CSS transition + self-deleting setTimeouts
+  }
 
-    // Check pipe collisions with some tolerance
-    const tolerance = 5;
+  function checkCollisions() {
+    if (gameState.noteY < 0 || gameState.noteY + NOTE_SIZE > gameState.gameHeight) {
+      triggerGameOver();
+      return;
+    }
+
+    const noteRect = elements.noteInner.getBoundingClientRect();
     
-    for (const pipe of gameState.pipes) {
-      const pipeRight = pipe.x + PIPE_WIDTH;
-      
-      // Check if note overlaps with pipe horizontally
-      if (noteRight - tolerance > pipe.x && noteX + tolerance < pipeRight) {
-        // Check if note is outside the gap vertically
-        if (gameState.noteY + tolerance < pipe.gapTop || noteBottom - tolerance > pipe.gapBottom) {
-          endGame();
-          return;
-        }
+    // Slight tolerance to make bounding box feel fair vs visual art bounds
+    const shrink = 4;
+    const noteHitbox = {
+      left: noteRect.left + shrink,
+      right: noteRect.right - shrink,
+      top: noteRect.top + shrink,
+      bottom: noteRect.bottom - shrink
+    };
+
+    for (let pipe of gameState.pipes) {
+      const topRect = pipe.topElement.getBoundingClientRect();
+      const botRect = pipe.bottomElement.getBoundingClientRect();
+
+      const intersect = (r1, r2) => {
+        return !(r1.right < r2.left || 
+                 r1.left > r2.right || 
+                 r1.bottom < r2.top || 
+                 r1.top > r2.bottom);
+      };
+
+      if (intersect(noteHitbox, topRect) || intersect(noteHitbox, botRect)) {
+        triggerGameOver();
+        return;
       }
     }
   }
 
-  function updateScoreDisplay() {
-    elements.scoreDisplay.textContent = gameState.score;
-  }
-
-  function endGame() {
+  function triggerGameOver() {
     gameState.isPlaying = false;
     if (gameState.animationId) {
       cancelAnimationFrame(gameState.animationId);
       gameState.animationId = null;
     }
 
+    playGameOverSound();
     saveHighScore();
 
     elements.finalScore.textContent = gameState.score;
     elements.finalBest.textContent = gameState.highScore;
-    elements.gameOver.classList.add('active');
+
+    setTimeout(() => {
+      elements.gameOver.classList.add('active');
+    }, 400);
+  }
+
+  function updateScoreDisplay() {
+    elements.scoreDisplay.textContent = gameState.score;
   }
 
   function showReadyNotification() {
