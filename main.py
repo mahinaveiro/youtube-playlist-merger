@@ -190,7 +190,7 @@ def _has_playable_content(data: dict) -> bool:
     return bool(data.get("id") or data.get("url"))
 
 
-def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST") -> None:
+def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST", quality: str = "320") -> None:
     job_dir = _job_dir(job_id)
     url = url.strip()
 
@@ -296,7 +296,7 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST")
             {
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
-                "preferredquality": "320",
+                "preferredquality": quality,
             },
         ],
         "quiet": False,
@@ -485,6 +485,7 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST")
 class CreateJobBody(BaseModel):
     url: str = Field(..., min_length=4, max_length=2048)
     filename: str = Field(default="ULTIMATE_PLAYLIST", min_length=1, max_length=100)
+    quality: str = Field(default="320k")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -520,7 +521,11 @@ async def create_job(body: CreateJobBody, background_tasks: BackgroundTasks):
             "created_at": created_at.isoformat(),
         }
 
-    background_tasks.add_task(process_playlist, job_id, raw, safe_filename)
+    # Sanitize quality 
+    quality = body.quality if body.quality in ["320k", "128k"] else "320k"
+    quality_val = "128" if quality == "128k" else "320"
+
+    background_tasks.add_task(process_playlist, job_id, raw, safe_filename, quality_val)
     background_tasks.add_task(schedule_job_cleanup, job_id, 1)  # Auto-delete after 1 hour
     
     return {"job_id": job_id}

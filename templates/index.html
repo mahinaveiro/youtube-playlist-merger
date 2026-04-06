@@ -97,6 +97,33 @@
           maxlength="100"
           class="mb-4 w-full min-h-[52px] rounded-xl border border-zinc-700 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 outline-none ring-emerald-500/40 transition focus:border-emerald-500/50 focus:ring-2"
         />
+
+        <label class="mb-2 block text-sm font-medium text-zinc-300">Audio Quality</label>
+        <div class="mb-6 grid grid-cols-2 gap-3" id="quality-selector">
+          <button
+            type="button"
+            data-quality="320k"
+            class="quality-btn rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-3 text-left transition"
+          >
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-emerald-400">Quality</span>
+              <svg class="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <p class="mt-1 text-xs text-emerald-500/80">Bigger file, best sound</p>
+          </button>
+          
+          <button
+            type="button"
+            data-quality="128k"
+            class="quality-btn rounded-xl border border-zinc-700 bg-zinc-950/80 p-3 text-left transition hover:border-zinc-600 hover:bg-zinc-900/80"
+          >
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-zinc-300">Light</span>
+              <svg class="hidden h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <p class="mt-1 text-xs text-zinc-500">Smaller file, fast download</p>
+          </button>
+        </div>
         
         <button
           id="btn-merge"
@@ -261,6 +288,33 @@
         let pollTimer = null;
         let isPlayingGame = false;
         let processingComplete = false;
+        let currentQuality = "320k";
+
+        // Handle quality selection UI and state
+        const qualityBtns = document.querySelectorAll(".quality-btn");
+        qualityBtns.forEach(btn => {
+          btn.addEventListener("click", () => {
+            currentQuality = btn.dataset.quality;
+            qualityBtns.forEach(b => {
+              const isSelected = b.dataset.quality === currentQuality;
+              const title = b.querySelector('span');
+              const desc = b.querySelector('p');
+              const icon = b.querySelector('svg');
+
+              if (isSelected) {
+                b.className = "quality-btn rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-3 text-left transition";
+                title.className = "font-semibold text-emerald-400";
+                desc.className = "mt-1 text-xs text-emerald-500/80";
+                icon.classList.remove('hidden');
+              } else {
+                b.className = "quality-btn rounded-xl border border-zinc-700 bg-zinc-950/80 p-3 text-left transition hover:border-zinc-600 hover:bg-zinc-900/80";
+                title.className = "font-semibold text-zinc-300";
+                desc.className = "mt-1 text-xs text-zinc-500";
+                icon.classList.add('hidden');
+              }
+            });
+          });
+        });
 
         // Initialize Neela Tap game
         document.addEventListener('DOMContentLoaded', () => {
@@ -428,7 +482,7 @@
             const res = await fetch("/create-job", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ url, filename }),
+              body: JSON.stringify({ url, filename, quality: currentQuality }),
             });
             const body = await res.json().catch(() => ({}));
             if (!res.ok) {
