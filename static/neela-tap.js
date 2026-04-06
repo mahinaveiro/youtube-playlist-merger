@@ -316,20 +316,14 @@
   function startGame() {
     initAudio();
     
-    // CRITICAL FIX: Force resize calculation BEFORE showing countdown
-    // The canvas needs to be visible to get correct dimensions
+    // Force resize calculation BEFORE showing countdown
     elements.startScreen.style.display = 'none';
-    handleResize(); // Recalculate dimensions now that canvas is visible
-    
-    console.log('After resize:', {
-      width: gameState.gameWidth,
-      height: gameState.gameHeight
-    });
+    handleResize();
     
     // Show countdown overlay
     elements.countdown.classList.add('active');
     elements.note.style.display = 'block';
-    elements.scoreDisplay.style.display = 'none'; // Hide score during countdown
+    elements.scoreDisplay.style.display = 'none';
     
     // Position note immediately with correct dimensions
     gameState.noteY = gameState.gameHeight / 2 - NOTE_SIZE / 2;
@@ -339,19 +333,14 @@
     elements.note.style.transform = `translate(${initialX}px, ${gameState.noteY}px) rotate(0deg)`;
     void elements.note.offsetHeight;
     
-    console.log('Note positioned at:', {
-      noteY: gameState.noteY,
-      initialX: initialX
-    });
-    
     // Countdown sequence: 3... 2... 1... GO!
     let count = 3;
     elements.countdownNumber.textContent = count;
     elements.countdownNumber.className = 'neela-countdown-number';
-    void elements.countdownNumber.offsetWidth; // Force reflow
+    void elements.countdownNumber.offsetWidth;
     elements.countdownNumber.classList.add('neela-countdown-animate');
     
-    playOscillator(440, 'sine', 0.1, 0.3); // Beep sound
+    playOscillator(440, 'sine', 0.1, 0.3);
     
     const countdownInterval = setInterval(() => {
       count--;
@@ -367,7 +356,7 @@
         elements.countdownNumber.className = 'neela-countdown-number neela-countdown-go';
         void elements.countdownNumber.offsetWidth;
         elements.countdownNumber.classList.add('neela-countdown-animate');
-        playOscillator(660, 'sine', 0.15, 0.4); // Higher pitch for GO
+        playOscillator(660, 'sine', 0.15, 0.4);
       } else {
         clearInterval(countdownInterval);
         elements.countdown.classList.remove('active');
@@ -377,16 +366,6 @@
   }
   
   function actuallyStartGame() {
-    console.log('=== GAME STARTING ===');
-    console.log('Game dimensions:', {
-      width: gameState.gameWidth,
-      height: gameState.gameHeight
-    });
-    console.log('Initial note position:', {
-      noteY: gameState.noteY,
-      noteVelocity: gameState.noteVelocity
-    });
-    
     elements.scoreDisplay.style.display = 'block';
     elements.gameOver.classList.remove('active');
     
@@ -654,34 +633,14 @@
   function checkCollisions() {
     // Boundary check
     if (gameState.noteY < 0 || gameState.noteY + NOTE_SIZE > gameState.gameHeight) {
-      console.log('COLLISION: Boundary hit', {
-        noteY: gameState.noteY,
-        gameHeight: gameState.gameHeight,
-        topBoundary: gameState.noteY < 0,
-        bottomBoundary: gameState.noteY + NOTE_SIZE > gameState.gameHeight
-      });
       triggerGameOver();
       return;
     }
 
     const noteRect = elements.noteInner.getBoundingClientRect();
     
-    console.log('Collision check:', {
-      noteRect: {
-        width: noteRect.width,
-        height: noteRect.height,
-        left: noteRect.left,
-        top: noteRect.top
-      },
-      noteY: gameState.noteY,
-      gameHeight: gameState.gameHeight,
-      pipeCount: gameState.pipes.length
-    });
-    
-    // CRITICAL FIX: Safety check - ensure note has valid dimensions before collision detection
-    // This prevents false collisions when note isn't fully rendered yet
+    // Safety check - ensure note has valid dimensions before collision detection
     if (noteRect.width === 0 || noteRect.height === 0) {
-      console.log('SKIPPING collision check - note not rendered');
       return; // Skip collision check this frame
     }
     
@@ -706,11 +665,6 @@
       };
 
       if (intersect(noteHitbox, topRect) || intersect(noteHitbox, botRect)) {
-        console.log('COLLISION: Pipe hit', {
-          noteHitbox,
-          topRect: {left: topRect.left, right: topRect.right, top: topRect.top, bottom: topRect.bottom},
-          botRect: {left: botRect.left, right: botRect.right, top: botRect.top, bottom: botRect.bottom}
-        });
         triggerGameOver();
         return;
       }
