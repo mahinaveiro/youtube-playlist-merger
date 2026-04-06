@@ -49,6 +49,17 @@
           placeholder="https://www.youtube.com/playlist?list=…"
           class="mb-4 w-full min-h-[52px] rounded-xl border border-zinc-700 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 outline-none ring-emerald-500/40 transition focus:border-emerald-500/50 focus:ring-2"
         />
+        
+        <label for="filename-input" class="mb-2 block text-sm font-medium text-zinc-300">Custom filename (optional)</label>
+        <input
+          id="filename-input"
+          type="text"
+          autocomplete="off"
+          placeholder="ULTIMATE_PLAYLIST"
+          maxlength="100"
+          class="mb-4 w-full min-h-[52px] rounded-xl border border-zinc-700 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 outline-none ring-emerald-500/40 transition focus:border-emerald-500/50 focus:ring-2"
+        />
+        
         <button
           id="btn-merge"
           type="button"
@@ -85,7 +96,13 @@
             </svg>
           </div>
           <p class="text-lg font-semibold text-white sm:text-xl">Your ultimate merged MP3 is ready!</p>
-          <p class="mt-2 text-sm text-zinc-400">Tap below to save <span class="text-emerald-400/90">ULTIMATE_PLAYLIST.mp3</span></p>
+          <p class="mt-2 text-sm text-zinc-400">Tap below to save <span id="success-filename" class="text-emerald-400/90">ULTIMATE_PLAYLIST.mp3</span></p>
+          
+          <div class="mt-4 rounded-lg border border-yellow-500/30 bg-yellow-950/20 p-3">
+            <p class="text-xs font-medium text-yellow-200">⚠️ Files will be auto-deleted in 1 hour</p>
+            <p class="mt-1 text-xs text-yellow-300/80">Download now to keep your merged playlist!</p>
+          </div>
+          
           <a
             id="btn-download"
             href="#"
@@ -171,6 +188,7 @@
         const panelSuccess = $("panel-success");
         const panelError = $("panel-error");
         const urlInput = $("url-input");
+        const filenameInput = $("filename-input");
         const btnMerge = $("btn-merge");
         const btnDownload = $("btn-download");
         const btnCleanup = $("btn-cleanup");
@@ -179,6 +197,7 @@
         const loadingTitle = $("loading-title");
         const loadingSub = $("loading-sub");
         const errorText = $("error-text");
+        const successFilename = $("success-filename");
 
         let jobId = null;
         let pollTimer = null;
@@ -228,7 +247,10 @@
           }
           if (stage === "completed") {
             stopPoll();
+            const filename = data.filename || "ULTIMATE_PLAYLIST";
             btnDownload.href = "/download/" + encodeURIComponent(jobId);
+            btnDownload.download = filename + ".mp3";
+            successFilename.textContent = filename + ".mp3";
             showSuccess();
             return;
           }
@@ -266,12 +288,14 @@
             urlInput.focus();
             return;
           }
+          const filename = (filenameInput.value || "").trim() || "ULTIMATE_PLAYLIST";
+          
           btnMerge.disabled = true;
           try {
             const res = await fetch("/create-job", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ url }),
+              body: JSON.stringify({ url, filename }),
             });
             const body = await res.json().catch(() => ({}));
             if (!res.ok) {
@@ -301,6 +325,7 @@
             jobId = null;
             stopPoll();
             urlInput.value = "";
+            filenameInput.value = "";
             showForm();
           }
         }
@@ -310,6 +335,7 @@
           jobId = null;
           stopPoll();
           urlInput.value = "";
+          filenameInput.value = "";
           showForm();
           urlInput.focus();
         });
@@ -321,6 +347,9 @@
         btnCleanup.addEventListener("click", cleanupJob);
 
         urlInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") createJob();
+        });
+        filenameInput.addEventListener("keydown", (e) => {
           if (e.key === "Enter") createJob();
         });
       })();

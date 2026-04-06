@@ -15,6 +15,8 @@ import subprocess
 import uuid
 from pathlib import Path
 from threading import Lock
+import asyncio
+from datetime import datetime, timedelta
 
 import yt_dlp
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
@@ -36,6 +38,23 @@ jobs_lock = Lock()
 jobs: dict[str, dict] = {}
 
 log = logging.getLogger("ultimate_playlist_merger")
+
+
+async def schedule_job_cleanup(job_id: str, delay_hours: int = 1):
+    """Schedule automatic cleanup of job files after specified hours."""
+    await asyncio.sleep(delay_hours * 3600)  # Convert hours to seconds
+    
+    log.info(f"Auto-cleanup triggered for job_id={job_id}")
+    target = _job_dir(job_id)
+    if target.is_dir():
+        try:
+            shutil.rmtree(target, ignore_errors=False)
+            log.info(f"Auto-deleted job folder: {target}")
+        except OSError as exc:
+            log.error(f"Auto-cleanup failed for job_id={job_id}: {exc}")
+    
+    with jobs_lock:
+        jobs.pop(job_id, None)
 
 
 @app.on_event("startup")
@@ -137,7 +156,7 @@ def _has_playable_content(data: dict) -> bool:
     return bool(data.get("id") or data.get("url"))
 
 
-def process_playlist(job_id: str, url: str) -> None:
+def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST") -> None:
     job_dir = _job_dir(job_id)
     url = url.strip()
 
@@ -301,7 +320,9 @@ def process_playlist(job_id: str, url: str) -> None:
 
         mp3_files = sorted(job_dir.glob("*.mp3"))
         # Ignore accidental output file from a previous partial run.
-        mp3_files = [p for p in mp3_files if p.name != "ULTIMATE_PLAYLIST.mp3"]
+        safe_filename = re.sub(r'[<>:"/\\|?*]', '_', filename)  # Sanitize filename
+        output_filename = f"{safe_filename}.mp3"
+        mp3_files = [p for p in mp3_files if p.name != output_filename]
         if not mp3_files:
             recent = _ytdlp_recent_messages(ytdlp_capture)
             raise RuntimeError(
@@ -318,7 +339,7 @@ def process_playlist(job_id: str, url: str) -> None:
         lines = [f"file '{_escape_concat_path(p)}'" for p in mp3_files]
         concat_list.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-        out_file = job_dir / "ULTIMATE_PLAYLIST.mp3"
+        out_file = job_dir / output_filename
         ff_proc = subprocess.run(
             [
                 "ffmpeg",
@@ -378,6 +399,7 @@ def process_playlist(job_id: str, url: str) -> None:
 
 class CreateJobBody(BaseModel):
     url: str = Field(..., min_length=4, max_length=2048)
+    filename: str = Field(default="ULTIMATE_PLAYLIST", min_length=1, max_length=100)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -394,17 +416,28 @@ async def create_job(body: CreateJobBody, background_tasks: BackgroundTasks):
     raw = body.url.strip()
     if not raw or not re.search(r"https?://", raw, re.I):
         raise HTTPException(status_code=400, detail="Please provide a valid http(s) URL.")
+    
+    # Sanitize filename
+    safe_filename = re.sub(r'[<>:"/\\|?*]', '_', body.filename.strip())
+    if not safe_filename:
+        safe_filename = "ULTIMATE_PLAYLIST"
 
     job_id = str(uuid.uuid4())
+    created_at = datetime.utcnow()
+    
     with jobs_lock:
         jobs[job_id] = {
             "stage": "fetching",
             "message": "Fetching playlist information...",
             "output_path": None,
             "error": None,
+            "filename": safe_filename,
+            "created_at": created_at.isoformat(),
         }
 
-    background_tasks.add_task(process_playlist, job_id, raw)
+    background_tasks.add_task(process_playlist, job_id, raw, safe_filename)
+    background_tasks.add_task(schedule_job_cleanup, job_id, 1)  # Auto-delete after 1 hour
+    
     return {"job_id": job_id}
 
 
@@ -420,6 +453,7 @@ async def status(job_id: str):
             "stage": job["stage"],
             "message": job.get("message"),
             "error": job.get("error"),
+            "filename": job.get("filename", "ULTIMATE_PLAYLIST"),
         }
     )
 
@@ -437,11 +471,13 @@ async def download(job_id: str):
     path = Path(job["output_path"])
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Merged file no longer exists.")
+    
+    download_filename = f"{job.get('filename', 'ULTIMATE_PLAYLIST')}.mp3"
 
     return FileResponse(
         path,
         media_type="audio/mpeg",
-        filename="ULTIMATE_PLAYLIST.mp3",
+        filename=download_filename,
     )
 
 
