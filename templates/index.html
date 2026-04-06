@@ -54,6 +54,7 @@
       };
     </script>
     <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="/static/neela-tap.css" />
   </head>
   <body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased selection:bg-emerald-500/30">
     <div class="pointer-events-none fixed inset-0 overflow-hidden">
@@ -185,8 +186,25 @@
       </footer>
     </main>
 
+    <!-- Neela Tap Game Prompt -->
+    <div class="neela-prompt-overlay" id="neela-prompt">
+      <div class="neela-prompt-card">
+        <h2 class="neela-prompt-heading">Wanna play a game in the meantime?</h2>
+        <div class="neela-prompt-buttons">
+          <button class="neela-btn neela-btn-primary" id="neela-lets-go">Let's go!</button>
+          <button class="neela-btn neela-btn-secondary" id="neela-nah">Nah</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Neela Tap Game Container -->
+    <div id="neela-tap-game"></div>
+
+    <script src="/static/neela-tap.js"></script>
     <script>
       (function () {
+        'use strict';
+
         const STAGE_COPY = {
           fetching: "Fetching playlist information...",
           downloading: "Downloading all MP3 files...",
@@ -235,9 +253,63 @@
         const loadingSub = $("loading-sub");
         const errorText = $("error-text");
         const successFilename = $("success-filename");
+        const neelaPrompt = $("neela-prompt");
+        const neelaLetsGo = $("neela-lets-go");
+        const neelaNah = $("neela-nah");
 
         let jobId = null;
         let pollTimer = null;
+        let isPlayingGame = false;
+        let processingComplete = false;
+
+        // Initialize Neela Tap game
+        document.addEventListener('DOMContentLoaded', () => {
+          if (window.NeelaTap) {
+            window.NeelaTap.init();
+            
+            // Set callbacks
+            window.NeelaTap.setOnQuit(() => {
+              isPlayingGame = false;
+              window.NeelaTap.hideGame();
+              if (processingComplete) {
+                showSuccess();
+              } else {
+                showLoading();
+              }
+            });
+            
+            window.NeelaTap.setOnMixReady(() => {
+              isPlayingGame = false;
+              window.NeelaTap.hideGame();
+              showSuccess();
+            });
+          }
+        });
+
+        // Game prompt handlers
+        neelaLetsGo.addEventListener('click', () => {
+          neelaPrompt.classList.remove('active');
+          isPlayingGame = true;
+          window.NeelaTap.showGame();
+        });
+
+        neelaNah.addEventListener('click', () => {
+          neelaPrompt.classList.remove('active');
+          showWittyMessage();
+          showLoading();
+        });
+
+        function showWittyMessage() {
+          const toast = document.createElement('div');
+          toast.className = 'neela-toast';
+          toast.textContent = 'Ah ok you are so mean bruh';
+          document.body.appendChild(toast);
+          
+          setTimeout(() => {
+            toast.classList.add('hiding');
+            setTimeout(() => toast.remove(), 400);
+          }, 3000);
+        }
 
         function showForm() {
           panelForm.classList.remove("hidden");
@@ -279,16 +351,28 @@
           const stage = data.stage;
           if (stage === "error") {
             stopPoll();
+            processingComplete = false;
+            if (isPlayingGame) {
+              window.NeelaTap.hideGame();
+              isPlayingGame = false;
+            }
             showError(data.error || "Processing failed.");
             return;
           }
           if (stage === "completed") {
             stopPoll();
+            processingComplete = true;
             const filename = data.filename || "ULTIMATE_PLAYLIST";
             btnDownload.href = "/download/" + encodeURIComponent(jobId);
             btnDownload.download = filename + ".mp3";
             successFilename.textContent = filename + ".mp3";
-            showSuccess();
+            
+            if (isPlayingGame) {
+              // Show notification banner in game
+              window.NeelaTap.showReadyNotification();
+            } else {
+              showSuccess();
+            }
             return;
           }
           const title = STAGE_COPY[stage] || "Working…";
@@ -302,6 +386,11 @@
             const res = await fetch("/status/" + encodeURIComponent(jobId));
             if (!res.ok) {
               stopPoll();
+              processingComplete = false;
+              if (isPlayingGame) {
+                window.NeelaTap.hideGame();
+                isPlayingGame = false;
+              }
               showError("Could not read job status (" + res.status + ").");
               return;
             }
@@ -309,6 +398,11 @@
             applyStage(data);
           } catch (e) {
             stopPoll();
+            processingComplete = false;
+            if (isPlayingGame) {
+              window.NeelaTap.hideGame();
+              isPlayingGame = false;
+            }
             showError("Network error while checking status.");
           }
         }
@@ -339,7 +433,11 @@
               throw new Error(formatServerDetail(body.detail));
             }
             jobId = body.job_id;
-            showLoading();
+            processingComplete = false;
+            
+            // Show game prompt instead of loading immediately
+            neelaPrompt.classList.add('active');
+            
             loadingTitle.textContent = STAGE_COPY.fetching;
             loadingSub.textContent = "";
             startPoll();
@@ -361,6 +459,8 @@
             btnCleanup.disabled = false;
             jobId = null;
             stopPoll();
+            processingComplete = false;
+            isPlayingGame = false;
             urlInput.value = "";
             filenameInput.value = "";
             showForm();
@@ -371,6 +471,8 @@
         btnNew.addEventListener("click", () => {
           jobId = null;
           stopPoll();
+          processingComplete = false;
+          isPlayingGame = false;
           urlInput.value = "";
           filenameInput.value = "";
           showForm();
@@ -378,6 +480,8 @@
         });
         btnRetry.addEventListener("click", () => {
           stopPoll();
+          processingComplete = false;
+          isPlayingGame = false;
           showForm();
           urlInput.focus();
         });
