@@ -93,11 +93,11 @@
   }
 
   // --- Constants & Config ---
-  const GRAVITY = 0.22;
-  const FLAP_STRENGTH = -5.5;
-  const TERMINAL_VELOCITY = 6;
-  const PIPE_SPEED_BASE = 2.5;
-  const MAX_PIPE_SPEED = 5.0;
+  const GRAVITY = 0.15;           // Reduced from 0.22 for smoother, slower fall
+  const FLAP_STRENGTH = -4.2;     // Reduced from -5.5 for gentler, more graceful jumps
+  const TERMINAL_VELOCITY = 4.5;  // Reduced from 6 for slower maximum fall speed
+  const PIPE_SPEED_BASE = 2.0;    // Reduced from 2.5 for slower, more relaxed gameplay
+  const MAX_PIPE_SPEED = 4.0;     // Reduced from 5.0 to keep difficulty manageable
   const PIPE_WIDTH = 52;
   const PIPE_SPAWN_INTERVAL = 2000; // ms
   const NOTE_SIZE = 40;
