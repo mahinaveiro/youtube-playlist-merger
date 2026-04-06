@@ -93,13 +93,15 @@
   }
 
   // --- Constants & Config ---
-  const GRAVITY = 0.15;           // Reduced from 0.22 for smoother, slower fall
-  const FLAP_STRENGTH = -4.2;     // Reduced from -5.5 for gentler, more graceful jumps
-  const TERMINAL_VELOCITY = 4.5;  // Reduced from 6 for slower maximum fall speed
-  const PIPE_SPEED_BASE = 2.0;    // Reduced from 2.5 for slower, more relaxed gameplay
-  const MAX_PIPE_SPEED = 4.0;     // Reduced from 5.0 to keep difficulty manageable
+  const isMobile = window.innerWidth <= 640;
+  
+  const GRAVITY = isMobile ? 0.18 : 0.15;           // Faster on mobile for better responsiveness
+  const FLAP_STRENGTH = isMobile ? -5.0 : -4.2;     // Stronger flap on mobile
+  const TERMINAL_VELOCITY = isMobile ? 5.5 : 4.5;   // Faster fall on mobile
+  const PIPE_SPEED_BASE = 2.0;
+  const MAX_PIPE_SPEED = 4.0;
   const PIPE_WIDTH = 52;
-  const PIPE_SPAWN_INTERVAL = 2000; // ms
+  const PIPE_SPAWN_INTERVAL = isMobile ? 2500 : 2000; // More distance between pipes on mobile (2.5s vs 2s)
   const NOTE_SIZE = 40;
   const HIGH_SCORE_KEY = 'neela_tap_highscore';
 
@@ -218,12 +220,17 @@
   }
 
   function createBackgroundTexts() {
+    const isMobile = window.innerWidth <= 640;
+    
     // First text: "Codanela Production"
     const text1 = document.createElement('div');
     text1.className = 'neela-bg-text';
     text1.textContent = 'Codanela Production';
     text1.style.top = '35%';
     text1.style.left = '100%';
+    if (isMobile) {
+      text1.style.fontSize = '60px'; // Smaller on mobile
+    }
     elements.canvas.appendChild(text1);
     gameState.bgTexts.push({ element: text1, x: 100, speed: 0.15 });
 
@@ -233,6 +240,9 @@
     text2.textContent = 'Created by Mahin';
     text2.style.top = '65%';
     text2.style.left = '100%';
+    if (isMobile) {
+      text2.style.fontSize = '60px'; // Smaller on mobile
+    }
     elements.canvas.appendChild(text2);
     gameState.bgTexts.push({ element: text2, x: 100, speed: 0.18 });
 
