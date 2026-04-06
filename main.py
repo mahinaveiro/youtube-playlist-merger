@@ -228,9 +228,17 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST")
     
     # Check if cookies file exists and is readable
     cookies_path = BASE_DIR / "cookies.txt"
-    if not cookies_path.is_file():
-        log.warning(f"cookies.txt not found at {cookies_path}. Some videos may be unavailable.")
-        cookies_path = None
+    cookies_exist = cookies_path.is_file()
+    
+    if not cookies_exist:
+        log.warning(f"cookies.txt not found at {cookies_path}. YouTube may block requests as bot.")
+    else:
+        # Check if cookies are recent (modified within last 30 days)
+        import time
+        mtime = cookies_path.stat().st_mtime
+        age_days = (time.time() - mtime) / 86400
+        if age_days > 30:
+            log.warning(f"cookies.txt is {age_days:.0f} days old. Consider refreshing for better reliability.")
     
     ydl_opts = {
         "format": "bestaudio/best",
@@ -255,7 +263,7 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST")
     }
     
     # Add optional configs only if available
-    if cookies_path:
+    if cookies_exist:
         ydl_opts["cookiefile"] = str(cookies_path)
     
     if js_runtimes:
@@ -306,16 +314,37 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST")
                 rc = ydl.download([url])
             recent = _ytdlp_recent_messages(ytdlp_capture)
             if rc != 0:
-                raise RuntimeError(
-                    "yt-dlp reported a problem while downloading or extracting audio "
-                    f"(exit code {rc}).\n\n"
-                    + (recent if recent else "No detailed message was captured. See server logs.")
-                )
+                error_msg = "yt-dlp reported a problem while downloading or extracting audio " f"(exit code {rc}).\n\n"
+                
+                # Check if it's a bot detection error
+                if recent and ("Sign in to confirm you're not a bot" in recent or "bot" in recent.lower()):
+                    error_msg += "🤖 YouTube detected bot activity and blocked the request.\n\n"
+                    error_msg += "SOLUTION: Update your cookies.txt file with fresh YouTube cookies.\n"
+                    error_msg += "1. Install browser extension: 'Get cookies.txt LOCALLY'\n"
+                    error_msg += "2. Go to youtube.com (logged in)\n"
+                    error_msg += "3. Export cookies and replace cookies.txt\n"
+                    error_msg += "4. Redeploy your app\n\n"
+                    error_msg += f"Details:\n{recent}"
+                else:
+                    error_msg += recent if recent else "No detailed message was captured. See server logs."
+                
+                raise RuntimeError(error_msg)
         except DownloadError as exc:
             recent = _ytdlp_recent_messages(ytdlp_capture)
             body = str(exc).strip()
-            if recent:
+            
+            # Check if it's a bot detection error
+            if recent and ("Sign in to confirm you're not a bot" in recent or "bot" in recent.lower()):
+                body = "🤖 YouTube detected bot activity and blocked the request.\n\n"
+                body += "SOLUTION: Update your cookies.txt file with fresh YouTube cookies.\n"
+                body += "1. Install browser extension: 'Get cookies.txt LOCALLY'\n"
+                body += "2. Go to youtube.com (logged in)\n"
+                body += "3. Export cookies and replace cookies.txt\n"
+                body += "4. Redeploy your app\n\n"
+                body += f"Details:\n{recent}"
+            elif recent:
                 body = f"{body}\n\nLast yt-dlp output:\n{recent}"
+            
             raise RuntimeError(body) from exc
 
         mp3_files = sorted(job_dir.glob("*.mp3"))

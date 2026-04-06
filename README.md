@@ -85,3 +85,11 @@ If you see errors like "n challenge solving failed" or "Only images are availabl
 3. Ensure yt-dlp-ejs is installed: `python -c "from yt_dlp.dependencies import yt_dlp_ejs; print(bool(yt_dlp_ejs))"`
 4. Update your cookies.txt with fresh YouTube cookies (export from browser using an extension like "Get cookies.txt LOCALLY")
 5. Some videos may be region-restricted or require authentication even with cookies
+
+## Bot Detection / Cookie Issues
+
+If you see "Sign in to confirm you're not a bot" errors:
+
+- Your cookies.txt file has expired or is invalid
+- See [COOKIES_UPDATE_GUIDE.md](COOKIES_UPDATE_GUIDE.md) for detailed instructions
+- YouTube cookies typically need refreshing every 1-2 weeks
