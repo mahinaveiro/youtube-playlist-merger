@@ -8,6 +8,7 @@ like a normal client and parses the returned pages/player responses.
 
 from __future__ import annotations
 
+import logging
 import re
 import shutil
 import subprocess
@@ -33,6 +34,40 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 jobs_lock = Lock()
 jobs: dict[str, dict] = {}
+
+log = logging.getLogger("ultimate_playlist_merger")
+
+
+def _strip_ansi(text: str) -> str:
+    return re.sub(r"\x1b\[[0-9;:]*m", "", text)
+
+
+class _YtdlpErrCapture:
+    """Collect yt-dlp errors/warnings (to_stderr → logger.error); ignore noisy progress (debug)."""
+
+    __slots__ = ("lines",)
+
+    def __init__(self) -> None:
+        self.lines: list[str] = []
+
+    def debug(self, msg: object) -> None:
+        pass
+
+    def info(self, msg: object) -> None:
+        pass
+
+    def warning(self, msg: object) -> None:
+        self.lines.append(_strip_ansi(str(msg).strip()))
+
+    def error(self, msg: object) -> None:
+        self.lines.append(_strip_ansi(str(msg).strip()))
+
+
+def _ytdlp_recent_messages(capture: _YtdlpErrCapture, *, max_lines: int = 25) -> str:
+    if not capture.lines:
+        return ""
+    chunk = capture.lines[-max_lines:]
+    return "\n".join(chunk)
 
 
 def _validate_job_id(job_id: str) -> str:
@@ -142,20 +177,34 @@ def process_playlist(job_id: str, url: str) -> None:
         )
 
         # Phase 2: extract 320 kbps MP3 in strict playlist order (playlist_index).
-        dl_opts = {**ydl_opts, "quiet": True, "no_warnings": True}
+        ytdlp_capture = _YtdlpErrCapture()
+        dl_opts = {**ydl_opts, "quiet": True, "no_warnings": True, "logger": ytdlp_capture}
         try:
             with yt_dlp.YoutubeDL(dl_opts) as ydl:
                 rc = ydl.download([url])
+            recent = _ytdlp_recent_messages(ytdlp_capture)
             if rc != 0:
-                raise RuntimeError("Download or audio extraction failed.")
+                raise RuntimeError(
+                    "yt-dlp reported a problem while downloading or extracting audio "
+                    f"(exit code {rc}).\n\n"
+                    + (recent if recent else "No detailed message was captured. See server logs.")
+                )
         except DownloadError as exc:
-            raise RuntimeError(str(exc)) from exc
+            recent = _ytdlp_recent_messages(ytdlp_capture)
+            body = str(exc).strip()
+            if recent:
+                body = f"{body}\n\nLast yt-dlp output:\n{recent}"
+            raise RuntimeError(body) from exc
 
         mp3_files = sorted(job_dir.glob("*.mp3"))
         # Ignore accidental output file from a previous partial run.
         mp3_files = [p for p in mp3_files if p.name != "ULTIMATE_PLAYLIST.mp3"]
         if not mp3_files:
-            raise RuntimeError("No MP3 files were produced. Check the URL and try again.")
+            recent = _ytdlp_recent_messages(ytdlp_capture)
+            raise RuntimeError(
+                "No MP3 files were produced after the download step.\n\n"
+                + (recent if recent else "Check cookies.txt, URL, and that FFmpeg is available on the server.")
+            )
 
         set_state(
             stage="merging",
@@ -209,10 +258,10 @@ def process_playlist(job_id: str, url: str) -> None:
             error="Operation timed out. Try a smaller playlist or check your connection.",
         )
     except Exception as exc:  # noqa: BLE001 — surface any failure to the client
-        msg = str(exc).strip() or "Something went wrong."
-        # Shorten huge yt-dlp stderr dumps for the UI
-        if len(msg) > 2000:
-            msg = msg[:2000] + "…"
+        full_msg = str(exc).strip() or "Something went wrong."
+        log.error("Job failed job_id=%s: %s", job_id, full_msg, exc_info=True)
+        # Allow longer yt-dlp traces in the UI; full text is also in server logs above
+        msg = full_msg if len(full_msg) <= 8000 else full_msg[:8000] + "…"
         set_state(stage="error", message=None, error=msg)
     finally:
         # Remove concat sidecar; keep per-track MP3s until user cleanup (or re-merge).
