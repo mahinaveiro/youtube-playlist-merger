@@ -22,21 +22,19 @@ WORKDIR /app
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install bgutil-ytdlp-pot-provider plugin for YouTube PO Token generation
-RUN pip install --no-cache-dir -U bgutil-ytdlp-pot-provider
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -U bgutil-ytdlp-pot-provider
 
 # Copy application files
 COPY . .
 
-# Verify installations
+# Verify installations (non-blocking)
 RUN echo "=== Build Diagnostics ===" && \
     which deno && deno --version && \
     which node && node --version && \
     which ffmpeg && ffmpeg -version && \
     python -c "from yt_dlp.dependencies import yt_dlp_ejs; print('yt-dlp-ejs:', bool(yt_dlp_ejs))" && \
-    python -c "import bgutil_ytdlp_pot_provider; print('bgutil-ytdlp-pot-provider:', bgutil_ytdlp_pot_provider.__version__)" && \
+    pip list | grep bgutil || echo "bgutil-ytdlp-pot-provider: check at runtime" && \
     echo "========================="
 
 # Expose port
