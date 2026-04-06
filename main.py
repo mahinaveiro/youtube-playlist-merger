@@ -307,7 +307,7 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST",
         "sleep_interval": 5,  # Avoid YouTube rate limiting
         "extractor_args": {
             "youtube": {
-                "player_client": ["web", "web_embedded", "tv"],
+                "player_client": ["tv_embedded", "web_embedded", "tv"],
             },
         },
     }
@@ -485,7 +485,7 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST",
 class CreateJobBody(BaseModel):
     url: str = Field(..., min_length=4, max_length=2048)
     filename: str = Field(default="ULTIMATE_PLAYLIST", min_length=1, max_length=100)
-    quality: str = Field(default="320k")
+    quality: str = Field(default="320", pattern="^(320|128)$")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -521,11 +521,7 @@ async def create_job(body: CreateJobBody, background_tasks: BackgroundTasks):
             "created_at": created_at.isoformat(),
         }
 
-    # Sanitize quality 
-    quality = body.quality if body.quality in ["320k", "128k"] else "320k"
-    quality_val = "128" if quality == "128k" else "320"
-
-    background_tasks.add_task(process_playlist, job_id, raw, safe_filename, quality_val)
+    background_tasks.add_task(process_playlist, job_id, raw, safe_filename, body.quality)
     background_tasks.add_task(schedule_job_cleanup, job_id, 1)  # Auto-delete after 1 hour
     
     return {"job_id": job_id}

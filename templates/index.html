@@ -79,14 +79,52 @@
         style="animation-delay: 0.05s"
       >
         <label for="url-input" class="mb-2 block text-sm font-medium text-zinc-300">Playlist or video URL</label>
-        <input
-          id="url-input"
-          type="url"
-          inputmode="url"
-          autocomplete="off"
-          placeholder="https://www.youtube.com/playlist?list=…"
-          class="mb-4 w-full min-h-[52px] rounded-xl border border-zinc-700 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 outline-none ring-emerald-500/40 transition focus:border-emerald-500/50 focus:ring-2"
-        />
+        <div class="relative flex mb-4 shadow-sm group">
+          <input
+            id="url-input"
+            type="url"
+            inputmode="url"
+            autocomplete="off"
+            placeholder="https://www.youtube.com/playlist?list=…"
+            class="flex-1 min-h-[52px] w-full rounded-l-xl border border-zinc-700 border-r-0 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 outline-none ring-0 transition tracking-wide group-focus-within:border-emerald-500/50"
+          />
+          <div class="relative flex" id="quality-dropdown-container">
+            <div class="w-[1px] bg-zinc-700/80 my-2 shadow"></div>
+            
+            <button
+              id="quality-dropdown-btn"
+              type="button"
+              class="flex h-full min-w-[110px] items-center justify-between rounded-r-xl border border-zinc-700 border-l-0 bg-zinc-900/50 px-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 focus:outline-none focus:bg-zinc-800 group-focus-within:border-emerald-500/50"
+            >
+              <span id="quality-selected-text">Quality</span>
+              <svg id="quality-chevron" class="ml-1 h-4 w-4 text-zinc-500 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            <div
+              id="quality-dropdown-menu"
+              class="absolute right-0 mt-2 hidden w-36 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl z-50 transform origin-top transition-all"
+            >
+              <ul class="py-1 text-sm text-zinc-300" id="quality-options">
+                <li>
+                  <button type="button" class="flex w-full items-center justify-between px-4 py-2.5 hover:bg-zinc-800 transition text-emerald-400 font-medium" data-value="320k" data-label="Quality">
+                    <span>Quality</span>
+                    <span class="text-xs text-emerald-500/80 ml-2">320k</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="flex w-full items-center justify-between px-4 py-2.5 hover:bg-zinc-800 transition" data-value="128k" data-label="Light">
+                    <span>Light</span>
+                    <span class="text-xs text-zinc-500 ml-2">128k</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <!-- Focus ring wrapper -->
+          <div class="pointer-events-none absolute inset-0 rounded-xl ring-0 ring-emerald-500/40 transition group-focus-within:ring-2"></div>
+        </div>
         
         <label for="filename-input" class="mb-2 block text-sm font-medium text-zinc-300">Custom filename (optional)</label>
         <input
@@ -95,35 +133,8 @@
           autocomplete="off"
           placeholder="ULTIMATE_PLAYLIST"
           maxlength="100"
-          class="mb-4 w-full min-h-[52px] rounded-xl border border-zinc-700 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 outline-none ring-emerald-500/40 transition focus:border-emerald-500/50 focus:ring-2"
+          class="mb-6 w-full min-h-[52px] rounded-xl border border-zinc-700 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 outline-none ring-emerald-500/40 transition focus:border-emerald-500/50 focus:ring-2"
         />
-
-        <label class="mb-2 block text-sm font-medium text-zinc-300">Audio Quality</label>
-        <div class="mb-6 grid grid-cols-2 gap-3" id="quality-selector">
-          <button
-            type="button"
-            data-quality="320k"
-            class="quality-btn rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-3 text-left transition"
-          >
-            <div class="flex items-center justify-between">
-              <span class="font-semibold text-emerald-400">Quality</span>
-              <svg class="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
-            <p class="mt-1 text-xs text-emerald-500/80">Bigger file, best sound</p>
-          </button>
-          
-          <button
-            type="button"
-            data-quality="128k"
-            class="quality-btn rounded-xl border border-zinc-700 bg-zinc-950/80 p-3 text-left transition hover:border-zinc-600 hover:bg-zinc-900/80"
-          >
-            <div class="flex items-center justify-between">
-              <span class="font-semibold text-zinc-300">Light</span>
-              <svg class="hidden h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
-            <p class="mt-1 text-xs text-zinc-500">Smaller file, fast download</p>
-          </button>
-        </div>
         
         <button
           id="btn-merge"
@@ -290,29 +301,69 @@
         let processingComplete = false;
         let currentQuality = "320k";
 
-        // Handle quality selection UI and state
-        const qualityBtns = document.querySelectorAll(".quality-btn");
-        qualityBtns.forEach(btn => {
-          btn.addEventListener("click", () => {
-            currentQuality = btn.dataset.quality;
-            qualityBtns.forEach(b => {
-              const isSelected = b.dataset.quality === currentQuality;
-              const title = b.querySelector('span');
-              const desc = b.querySelector('p');
-              const icon = b.querySelector('svg');
+        // Handle custom dropdown
+        const qBtn = $("quality-dropdown-btn");
+        const qMenu = $("quality-dropdown-menu");
+        const qText = $("quality-selected-text");
+        const qChevron = $("quality-chevron");
+        const qOptions = document.querySelectorAll("#quality-options button");
+        
+        let qOpen = false;
 
-              if (isSelected) {
-                b.className = "quality-btn rounded-xl border border-emerald-500/50 bg-emerald-500/10 p-3 text-left transition";
-                title.className = "font-semibold text-emerald-400";
-                desc.className = "mt-1 text-xs text-emerald-500/80";
-                icon.classList.remove('hidden');
+        function closeQualityMenu() {
+          qOpen = false;
+          qMenu.classList.add("hidden");
+          qChevron.classList.remove("rotate-180");
+        }
+
+        qBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          qOpen = !qOpen;
+          if (qOpen) {
+            // Check viewport bounds to prevent dropping below screen
+            const rect = qBtn.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            if (spaceBelow < 120) {
+              qMenu.classList.remove("top-full", "mt-2");
+              qMenu.classList.add("bottom-full", "mb-2");
+            } else {
+              qMenu.classList.remove("bottom-full", "mb-2");
+              qMenu.classList.add("top-full", "mt-2");
+            }
+            qMenu.classList.remove("hidden");
+            qChevron.classList.add("rotate-180");
+          } else {
+            closeQualityMenu();
+          }
+        });
+
+        document.addEventListener("click", () => {
+          if (qOpen) closeQualityMenu();
+        });
+
+        qOptions.forEach(opt => {
+          opt.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            currentQuality = opt.dataset.value;
+            qText.textContent = opt.dataset.label;
+            
+            // update styles
+            qOptions.forEach(o => {
+              if (o === opt) {
+                o.classList.add("text-emerald-400", "font-medium");
+                const span = o.querySelector('.text-xs');
+                span.classList.remove("text-zinc-500");
+                span.classList.add("text-emerald-500/80");
               } else {
-                b.className = "quality-btn rounded-xl border border-zinc-700 bg-zinc-950/80 p-3 text-left transition hover:border-zinc-600 hover:bg-zinc-900/80";
-                title.className = "font-semibold text-zinc-300";
-                desc.className = "mt-1 text-xs text-zinc-500";
-                icon.classList.add('hidden');
+                o.classList.remove("text-emerald-400", "font-medium");
+                const span = o.querySelector('.text-xs');
+                span.classList.remove("text-emerald-500/80");
+                span.classList.add("text-zinc-500");
               }
             });
+            closeQualityMenu();
           });
         });
 
