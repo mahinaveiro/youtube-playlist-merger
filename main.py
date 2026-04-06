@@ -8,7 +8,6 @@ like a normal client and parses the returned pages/player responses.
 
 from __future__ import annotations
 
-import json
 import re
 import shutil
 import subprocess
@@ -16,11 +15,13 @@ import uuid
 from pathlib import Path
 from threading import Lock
 
+import yt_dlp
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from yt_dlp.utils import DownloadError
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMP_ROOT = BASE_DIR / "temp"
@@ -61,7 +62,7 @@ def _has_playable_content(data: dict) -> bool:
     return bool(data.get("id") or data.get("url"))
 
 
-def process_job(job_id: str, url: str) -> None:
+def process_playlist(job_id: str, url: str) -> None:
     job_dir = _job_dir(job_id)
     url = url.strip()
 
@@ -84,6 +85,25 @@ def process_job(job_id: str, url: str) -> None:
             if error is not None:
                 j["error"] = error
 
+    ydl_opts = {
+        "cookiefile": "cookies.txt",
+        "js-runtimes": "deno",
+        "extractor_args": {"youtube": {"player_client": ["ios", "web", "android"]}},
+        "outtmpl": str(job_dir / "%(playlist_index)03d.%(ext)s"),
+        "outtmpl_na_placeholder": "001",
+        "noplaylist_reverse": True,
+        "format": "bestaudio/best",
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+            },
+        ],
+        "postprocessor_args": {
+            "ffmpeg": ["-c:a", "libmp3lame", "-b:a", "320k"],
+        },
+    }
+
     try:
         job_dir.mkdir(parents=True, exist_ok=True)
 
@@ -93,29 +113,22 @@ def process_job(job_id: str, url: str) -> None:
         )
 
         # Phase 1: resolve playlist / video (flat, no full video downloads).
-        info_proc = subprocess.run(
-            [
-                "yt-dlp",
-                "--flat-playlist",
-                "-J",
-                "--no-download",
-                url,
-            ],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            cwd=str(job_dir),
-            timeout=120,
-        )
-        if info_proc.returncode != 0:
-            err = (info_proc.stderr or info_proc.stdout or "").strip()
-            raise RuntimeError(err or "Could not read playlist or video information.")
+        phase1_opts = {
+            **ydl_opts,
+            "extract_flat": True,
+            "skip_download": True,
+            "quiet": True,
+            "no_warnings": True,
+        }
+        phase1_opts.pop("postprocessors", None)
+        phase1_opts.pop("postprocessor_args", None)
+        phase1_opts.pop("format", None)
 
         try:
-            meta = json.loads(info_proc.stdout)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError("Invalid response from yt-dlp while fetching metadata.") from exc
+            with yt_dlp.YoutubeDL(phase1_opts) as ydl:
+                meta = ydl.extract_info(url, download=False)
+        except DownloadError as exc:
+            raise RuntimeError(str(exc)) from exc
 
         if not _has_playable_content(meta):
             raise RuntimeError("No videos found for this URL.")
@@ -125,30 +138,15 @@ def process_job(job_id: str, url: str) -> None:
             message="Downloading all MP3 files...",
         )
 
-        # Phase 2: extract 320 kbps MP3 in strict playlist order (autonumber).
-        dl_proc = subprocess.run(
-            [
-                "yt-dlp",
-                "-x",
-                "--audio-format",
-                "mp3",
-                "--postprocessor-args",
-                "ffmpeg:-c:a libmp3lame -b:a 320k",
-                "-o",
-                "%(autonumber)03d.%(ext)s",
-                "--no-playlist-reverse",
-                url,
-            ],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            cwd=str(job_dir),
-            timeout=None,
-        )
-        if dl_proc.returncode != 0:
-            err = (dl_proc.stderr or dl_proc.stdout or "").strip()
-            raise RuntimeError(err or "Download or audio extraction failed.")
+        # Phase 2: extract 320 kbps MP3 in strict playlist order (playlist_index).
+        dl_opts = {**ydl_opts, "quiet": True, "no_warnings": True}
+        try:
+            with yt_dlp.YoutubeDL(dl_opts) as ydl:
+                rc = ydl.download([url])
+            if rc != 0:
+                raise RuntimeError("Download or audio extraction failed.")
+        except DownloadError as exc:
+            raise RuntimeError(str(exc)) from exc
 
         mp3_files = sorted(job_dir.glob("*.mp3"))
         # Ignore accidental output file from a previous partial run.
@@ -251,7 +249,7 @@ async def create_job(body: CreateJobBody, background_tasks: BackgroundTasks):
             "error": None,
         }
 
-    background_tasks.add_task(process_job, job_id, raw)
+    background_tasks.add_task(process_playlist, job_id, raw)
     return {"job_id": job_id}
 
 

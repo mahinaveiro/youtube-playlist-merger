@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["ffmpeg", "python311", "python311Packages.pip"]
+nixPkgs = ["ffmpeg", "python311", "python311Packages.pip", "deno", "git"]
 
 [phases.build]
 cmds = [
@@ -8,5 +8,5 @@ cmds = [
 
 [phases.deploy]
 cmds = [
-  "uvicorn main:app --host 0.0.0.0 --port $PORT"
+  "uvicorn main:app --host 0.0.0.0 --port $PORT --log-level info"
 ]
