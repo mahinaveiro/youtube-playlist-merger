@@ -206,7 +206,7 @@
   weatherSounds.snow.loop = true;
   weatherSounds.rain.volume = 0;
   weatherSounds.snow.volume = 0;
-  weatherSounds.lightning.volume = 0.5;
+  weatherSounds.lightning.volume = 0.5; // Keeping lightning at 0.5 as requested
   
   function initAudio() {
     if (!audioCtx) {
@@ -345,21 +345,21 @@
   }
 
   function playFlapSound() {
-    playOscillator(520, 'sine', 0.08, 0.3);
+    playOscillator(520, 'sine', 0.08, 0.12); // Lowered from 0.3
   }
 
   function playScoreSound() {
     if (!audioCtx) return;
     try {
-      playOscillator(660, 'sine', 0.06, 0.2);
+      playOscillator(660, 'sine', 0.06, 0.08); // Lowered from 0.2
       setTimeout(() => {
-        playOscillator(880, 'sine', 0.06, 0.2);
+        playOscillator(880, 'sine', 0.06, 0.08); // Lowered from 0.2
       }, 60);
     } catch(e) {}
   }
 
   function playGameOverSound() {
-    playOscillator(440, 'triangle', 0.6, 0.4, 150, 0.6);
+    playOscillator(440, 'triangle', 0.6, 0.15, 150, 0.6); // Lowered from 0.4
   }
 
   // --- Constants & Config ---
@@ -1379,12 +1379,12 @@
     
     if (gameState.weather === 'rain' || gameState.weather === 'thunder') {
       elements.rainLayer.classList.add('active');
-      for(let i=0; i<80; i++) spawnWeatherElement('rain');
+      for(let i=0; i<120; i++) spawnWeatherElement('rain');
       fadeWeatherAudio('in', weatherSounds.rain);
       fadeWeatherAudio('out', weatherSounds.snow);
     } else if (gameState.weather === 'snow') {
       elements.snowLayer.classList.add('active');
-      for(let i=0; i<100; i++) spawnWeatherElement('snow');
+      for(let i=0; i<150; i++) spawnWeatherElement('snow');
       fadeWeatherAudio('in', weatherSounds.snow);
       fadeWeatherAudio('out', weatherSounds.rain);
     } else {
@@ -1401,8 +1401,8 @@
       audio.volume = 0;
       const interval = setInterval(() => {
         vol += 0.02;
-        if (vol >= 0.45) {
-          vol = 0.45;
+        if (vol >= 1.0) { // Maxed out as requested (was 0.45)
+          vol = 1.0;
           clearInterval(interval);
         }
         audio.volume = vol;
@@ -1434,16 +1434,13 @@
     el.className = type === 'rain' ? 'neela-rain-drop' : 'neela-snow-flake';
     
     const x = Math.random() * gameState.gameWidth;
-    const y = Math.random() * gameState.gameHeight - (gameState.gameHeight * 1.5); // Wider vertical range
-    const speed = type === 'rain' ? 14 + Math.random() * 8 : 2 + Math.random() * 3;
+    // Spread them vertically across and above the screen
+    const y = Math.random() * gameState.gameHeight * 1.5 - gameState.gameHeight; 
+    const speed = type === 'rain' ? 16 + Math.random() * 10 : 2 + Math.random() * 3; // Rain slightly faster
     
-    el.style.left = `${x}px`;
-    el.style.top = `${y}px`;
-    
-    // Wind-swept rain realism
-    if (type === 'rain') {
-      el.style.transform = 'rotate(-15deg)';
-    }
+    // We'll use absolute transform positioning, so reset base top/left
+    el.style.left = '0px';
+    el.style.top = '0px';
     
     const targetLayer = type === 'rain' ? elements.rainLayer : elements.snowLayer;
     targetLayer.appendChild(el);
@@ -1472,13 +1469,18 @@
         xOffset = Math.sin(timestamp * 0.002 + item.sinOffset) * 20;
       }
       
-      if (item.y > gameState.gameHeight) {
-        item.y = -20;
+      // Wrap around once it fully leaves the screen bottom
+      if (item.y > gameState.gameHeight + 20) {
+        item.y = -50;
         item.x = Math.random() * gameState.gameWidth;
       }
       
-      item.element.style.transform = `translate(${xOffset}px, ${item.y}px)`;
-      item.element.style.left = `${item.x}px`;
+      // Use transform for smooth movement, keeping rain rotation if needed
+      const transform = item.type === 'rain' 
+        ? `translate(${item.x + xOffset}px, ${item.y}px) rotate(-15deg)` 
+        : `translate(${item.x + xOffset}px, ${item.y}px)`;
+      
+      item.element.style.transform = transform;
     });
 
     // Thunder logic
