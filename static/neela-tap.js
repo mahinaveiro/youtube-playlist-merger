@@ -595,8 +595,9 @@
     gameState.pipeSpeed = START_PIPE_SPEED;
     gameState.spawnInterval = START_SPAWN_INTERVAL;
     
-    // Spawns first pipe after 0.5s for immediate action
-    gameState.lastPipeTimestamp = -1; 
+    // Position first pipe VERY close (45% across screen) for truly instant action
+    spawnPipe(gameState.gameWidth * 0.45);
+    gameState.lastPipeTimestamp = timestamp || performance.now();
     
     gameState.boss1Score = 25 + Math.floor(Math.random() * 10); // Random score 25-35
     gameState.boss2Score = 40 + Math.floor(Math.random() * 15); // Random score 40-55
@@ -679,11 +680,7 @@
       gameState.gameStartTimestamp = timestamp;
       gameState.lastFrameTimestamp = timestamp;
       
-      // Initialize if still 0 or -1
-      if (gameState.lastPipeTimestamp === -1) {
-        // Prime it to spawn in 500ms
-        gameState.lastPipeTimestamp = timestamp - (gameState.spawnInterval - 500);
-      } else if (!gameState.lastPipeTimestamp) {
+      if (!gameState.lastPipeTimestamp) {
         gameState.lastPipeTimestamp = timestamp;
       }
     }
@@ -1203,9 +1200,11 @@
     setTimeout(() => el.remove(), 1000);
   }
 
-  function spawnPipe() {
+  function spawnPipe(customX = null) {
     const isMobile = window.innerWidth <= 640;
     const gapHeight = isMobile ? 160 : 180;
+    
+    const spawnX = customX !== null ? customX : gameState.gameWidth;
     
     const minCenterY = gameState.gameHeight * 0.25;
     const maxCenterY = gameState.gameHeight * 0.75;
@@ -1220,7 +1219,7 @@
     topPipe.style.height = `${gapTop}px`;
     topPipe.style.left = '0px';
     topPipe.style.width = `${PIPE_WIDTH}px`;
-    topPipe.style.transform = `translateX(${gameState.gameWidth}px)`;
+    topPipe.style.transform = `translateX(${spawnX}px)`;
 
     const bottomPipe = document.createElement('div');
     bottomPipe.className = 'neela-pipe';
@@ -1228,13 +1227,13 @@
     bottomPipe.style.height = `${gameState.gameHeight - gapBottom}px`;
     bottomPipe.style.left = '0px';
     bottomPipe.style.width = `${PIPE_WIDTH}px`;
-    bottomPipe.style.transform = `translateX(${gameState.gameWidth}px)`;
+    bottomPipe.style.transform = `translateX(${spawnX}px)`;
 
     elements.canvas.appendChild(topPipe);
     elements.canvas.appendChild(bottomPipe);
 
     gameState.pipes.push({
-      x: gameState.gameWidth,
+      x: spawnX,
       topElement: topPipe,
       bottomElement: bottomPipe,
       scored: false,
