@@ -497,6 +497,16 @@ async def home(request: Request):
     )
 
 
+@app.get("/manifest.json")
+async def manifest():
+    return FileResponse(BASE_DIR / "static" / "manifest.json", media_type="application/manifest+json")
+
+
+@app.get("/service-worker.js")
+async def service_worker():
+    return FileResponse(BASE_DIR / "static" / "service-worker.js", media_type="application/javascript")
+
+
 @app.post("/create-job")
 async def create_job(body: CreateJobBody, background_tasks: BackgroundTasks):
     raw = body.url.strip()
