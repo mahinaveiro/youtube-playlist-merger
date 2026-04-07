@@ -278,12 +278,12 @@
   const FLAP_STRENGTH = isMobile ? -5.0 : -5.5;
   const TERMINAL_VELOCITY = isMobile ? 5.5 : 6.5;
   
-  const START_PIPE_SPEED = 1.8;
-  const MAX_PIPE_SPEED = 4.5;
+  const START_PIPE_SPEED = 2.4;   // Boosted starting speed
+  const MAX_PIPE_SPEED = 5.0;     // Slightly higher max
   const SPEED_INC = 0.08;
   
-  const START_SPAWN_INTERVAL = 2200;
-  const MIN_SPAWN_INTERVAL = 1400;
+  const START_SPAWN_INTERVAL = 3000; // Increased distance (3s gap between pipes)
+  const MIN_SPAWN_INTERVAL = 1600;   // Increased minimum gap
   
   const PIPE_WIDTH = 52;
   const NOTE_SIZE = 40;
