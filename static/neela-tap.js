@@ -200,13 +200,13 @@
   // --- Constants & Config ---
   const isMobile = window.innerWidth <= 640;
   
-  const GRAVITY = isMobile ? 0.18 : 0.15;           // Faster on mobile for better responsiveness
-  const FLAP_STRENGTH = isMobile ? -5.0 : -4.2;     // Stronger flap on mobile
-  const TERMINAL_VELOCITY = isMobile ? 5.5 : 4.5;   // Faster fall on mobile
-  const PIPE_SPEED_BASE = 2.0;
-  const MAX_PIPE_SPEED = 4.0;
+  const GRAVITY = isMobile ? 0.18 : 0.22;           // Faster on desktop
+  const FLAP_STRENGTH = isMobile ? -5.0 : -5.5;     // Stronger flap on desktop
+  const TERMINAL_VELOCITY = isMobile ? 5.5 : 6.5;   // Higher terminal velocity on desktop
+  const PIPE_SPEED_BASE = isMobile ? 2.0 : 3.0;     // Faster pipes on desktop
+  const MAX_PIPE_SPEED = isMobile ? 4.0 : 6.0;      // Higher max speed on desktop
   const PIPE_WIDTH = 52;
-  const PIPE_SPAWN_INTERVAL = isMobile ? 2500 : 2000; // More distance between pipes on mobile (2.5s vs 2s)
+  const PIPE_SPAWN_INTERVAL = isMobile ? 2500 : 1500; // More frequent pipes on desktop
   const NOTE_SIZE = 40;
   const HIGH_SCORE_KEY = 'neela_tap_highscore';
 
@@ -784,13 +784,14 @@
       return; // Skip collision check this frame
     }
     
-    // Slight tolerance to make bounding box feel fair vs visual art bounds
-    const shrink = 4;
+    // In favor of the player: significantly shrink the hitbox so it only fails if clearly touching
+    const shrinkX = 12; // More leeway horizontally
+    const shrinkY = 8;  // More leeway vertically
     const noteHitbox = {
-      left: noteRect.left + shrink,
-      right: noteRect.right - shrink,
-      top: noteRect.top + shrink,
-      bottom: noteRect.bottom - shrink
+      left: noteRect.left + shrinkX,
+      right: noteRect.right - shrinkX,
+      top: noteRect.top + shrinkY,
+      bottom: noteRect.bottom - shrinkY
     };
 
     for (let pipe of gameState.pipes) {
