@@ -156,6 +156,14 @@
       top: -10px;
       opacity: 0.8;
     }
+    .neela-thunder-flash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: white;
+      opacity: 0;
       z-index: 60;
       pointer-events: none;
     }
