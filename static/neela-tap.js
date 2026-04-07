@@ -558,11 +558,13 @@
     gameState.isPaused = false;
     gameState.score = 0;
     gameState.gameStartTimestamp = null;
+    gameState.lastFrameTimestamp = 0;
     
     clearPipes();
     clearParticles();
     
-    gameState.pipeSpeed = PIPE_SPEED_BASE;
+    gameState.pipeSpeed = START_PIPE_SPEED;
+    gameState.spawnInterval = START_SPAWN_INTERVAL;
     gameState.lastPipeTimestamp = 0;
     
     updateScoreDisplay();
