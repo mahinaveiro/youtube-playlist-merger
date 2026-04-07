@@ -1120,16 +1120,18 @@
       
       // Buffer current note pos
       gameState.ghostBuffer.push({ x: gameState.gameWidth * 0.2, y: gameState.noteY });
-      if (gameState.ghostBuffer.length > 90) {
+      if (gameState.ghostBuffer.length > 120) { // Increased delay to 2s
         const targetPos = gameState.ghostBuffer.shift();
-        ghost.element.style.transform = `translate(${targetPos.x}px, ${targetPos.y}px) rotate(${gameState.currentRotation}deg)`;
-        ghost.lastX = targetPos.x;
+        // Shift ghost horizontally to be slightly behind the player
+        const ghostX = targetPos.x - 30; 
+        ghost.element.style.transform = `translate(${ghostX}px, ${targetPos.y}px) rotate(${gameState.currentRotation}deg)`;
+        ghost.lastX = ghostX;
         ghost.lastY = targetPos.y;
       } else {
         // Drifting entrance from right
         const startX = gameState.gameWidth + 100;
-        const noteX = gameState.gameWidth * 0.2;
-        const driftProgress = Math.min(1, (now - ghost.spawnTime) / 3000); // 3s drift in
+        const noteX = (gameState.gameWidth * 0.2) - 30; // Target behind player
+        const driftProgress = Math.min(1, (now - ghost.spawnTime) / 4000); // Slower 4s drift in
         
         ghost.lastX = lerp(startX, noteX, driftProgress);
         ghost.lastY = gameState.gameHeight / 2 + Math.sin(now * 0.002) * 80;
@@ -1428,12 +1430,34 @@
 
   function triggerThunder() {
     elements.thunderFlash.style.opacity = '0.8';
-    playOscillator(100, 'sawtooth', 0.5, 0.2, 50, 0.5);
+    // Deep rumble
+    playOscillator(60, 'sawtooth', 0.8, 0.4, 30, 0.8);
+    // Sharp crack
+    playThunderCrack();
+    
     setTimeout(() => elements.thunderFlash.style.opacity = '0', 50);
     setTimeout(() => {
       elements.thunderFlash.style.opacity = '0.4';
       setTimeout(() => elements.thunderFlash.style.opacity = '0', 30);
     }, 100);
+  }
+
+  function playThunderCrack() {
+    if (!audioCtx) return;
+    try {
+      const bufferSize = audioCtx.sampleRate * 0.1;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for(let i=0; i<bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+      noise.connect(gain);
+      gain.connect(audioCtx.destination);
+      noise.start();
+    } catch(e) {}
   }
 
   function updateParticles() {
@@ -1501,12 +1525,12 @@
     }
 
     // Boss 2 Collision
-    if (gameState.bossGhost && gameState.ghostBuffer.length >= 90) {
+    if (gameState.bossGhost && gameState.ghostBuffer.length >= 120) {
       const ghostX = gameState.bossGhost.lastX;
       const ghostY = gameState.bossGhost.lastY;
       const noteX = gameState.gameWidth * 0.2;
       
-      const shrink = 8;
+      const shrink = 10; // More forgiving ghost hitbox
       const r1 = { left: noteX + shrink, right: noteX + 40 - shrink, top: gameState.noteY + shrink, bottom: gameState.noteY + 40 - shrink };
       const r2 = { left: ghostX + shrink, right: ghostX + 40 - shrink, top: ghostY + shrink, bottom: ghostY + 40 - shrink };
       
