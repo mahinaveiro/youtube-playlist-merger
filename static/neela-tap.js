@@ -876,9 +876,8 @@
     gameState.bossWall = {
       topElement: top,
       bottomElement: bot,
-      x: gameState.gameWidth,
-      holdStarted: 0,
-      phase: 'entering', // entering, holding, exiting
+      x: gameState.gameWidth + 100, // Start just off screen
+      phase: 'moving', // moving, exiting
       gapY: gameState.gameHeight / 2
     };
     
@@ -1003,22 +1002,11 @@
       wall.gapY = (gameState.gameHeight / 2) + gapOffset;
       
       // Horizontal movement
-      if (wall.phase === 'entering') {
-        wall.x -= 2.2 * timeScale;
-        if (wall.x <= gameState.gameWidth / 2 - 30) {
-          wall.x = gameState.gameWidth / 2 - 30;
-          wall.phase = 'holding';
-          wall.holdStarted = timestamp;
-        }
-      } else if (wall.phase === 'holding') {
-        if (timestamp - wall.holdStarted > 4000) {
-          wall.phase = 'exiting';
-        }
-      } else if (wall.phase === 'exiting') {
-        wall.x -= 2.2 * timeScale;
-        if (wall.x < -100) {
-          finishBoss1();
-        }
+      const wallSpeed = 3.5; // Faster arrival
+      wall.x -= wallSpeed * timeScale;
+      
+      if (wall.x < -100) {
+        finishBoss1();
       }
       
       wall.topElement.style.transform = `translate(${wall.x}px, ${wall.gapY - gapHeight/2 - 1000}px)`;
@@ -1048,12 +1036,15 @@
         ghost.lastX = targetPos.x;
         ghost.lastY = targetPos.y;
       } else {
-        // Drifting start
-        const tx = gameState.gameWidth / 2;
-        const ty = gameState.gameHeight / 2 + Math.sin(now * 0.002) * 50;
-        ghost.element.style.transform = `translate(${tx}px, ${ty}px)`;
-        ghost.lastX = tx;
-        ghost.lastY = ty;
+        // Drifting entrance from right
+        const startX = gameState.gameWidth + 100;
+        const noteX = gameState.gameWidth * 0.2;
+        const driftProgress = Math.min(1, (now - ghost.spawnTime) / 3000); // 3s drift in
+        
+        ghost.lastX = lerp(startX, noteX, driftProgress);
+        ghost.lastY = gameState.gameHeight / 2 + Math.sin(now * 0.002) * 80;
+        
+        ghost.element.style.transform = `translate(${ghost.lastX}px, ${ghost.lastY}px)`;
       }
       
       // Trails
@@ -1311,19 +1302,17 @@
     }
 
     // Boss 1 Collision
-    if (gameState.bossWall && gameState.bossWall.phase !== 'exiting') {
+    if (gameState.bossWall) {
       const wallX = gameState.bossWall.x;
       const wallW = 70;
       const gapY = gameState.bossWall.gapY;
-      const gapH = 155;
-      
-      const left = gameState.gameWidth * 0.2 + 18;
-      const right = left + 40 - 36;
-      const top = gameState.noteY + 14;
-      const bottom = top + 40 - 28;
+      const left = gameState.gameWidth * 0.2 + 8; // More precise hitboxes
+      const right = left + 40 - 16;
+      const top = gameState.noteY + 6;
+      const bottom = top + 40 - 12;
 
       if (right > wallX && left < wallX + wallW) {
-        if (top < gapY - gapH/2 || bottom > gapY + gapH/2) {
+        if (top < gapY - 155/2 || bottom > gapY + 155/2) {
           triggerGameOver();
           return;
         }
