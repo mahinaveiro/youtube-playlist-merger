@@ -33,6 +33,80 @@
       opacity: 0.8;
       will-change: transform, opacity;
     }
+    .neela-boss-banner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      transform: translateY(-100%);
+      transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    .neela-boss-banner.active {
+      transform: translateY(0);
+    }
+    .neela-boss-banner h2 {
+      font-size: 42px;
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      animation: neela-text-pulse 1.5s ease-in-out infinite;
+    }
+    .neela-boss-banner p {
+      font-size: 18px;
+      margin: 10px 0 0;
+      opacity: 0.8;
+    }
+    @keyframes neela-text-pulse {
+      0%, 100% { text-shadow: 0 0 10px currentColor; }
+      50% { text-shadow: 0 0 30px currentColor; }
+    }
+    .neela-wall {
+      position: absolute;
+      width: 60px;
+      z-index: 10;
+      will-change: transform;
+    }
+    .neela-wall-line {
+      position: absolute;
+      width: 2px;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.4);
+      top: 0;
+    }
+    .neela-ghost {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      z-index: 9;
+      pointer-events: none;
+      will-change: transform;
+      animation: neela-ghost-fade 0.8s ease-in-out infinite alternate;
+    }
+    @keyframes neela-ghost-fade {
+      from { opacity: 0.4; }
+      to { opacity: 0.6; }
+    }
+    .neela-flash-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      font-weight: bold;
+      z-index: 60;
+      pointer-events: none;
+      animation: neela-flash-anim 1s ease-out forwards;
+    }
+    @keyframes neela-flash-anim {
+      0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+    }
   `;
   document.head.appendChild(style);
 
@@ -200,13 +274,18 @@
   // --- Constants & Config ---
   const isMobile = window.innerWidth <= 640;
   
-  const GRAVITY = isMobile ? 0.18 : 0.22;           // Faster on desktop
-  const FLAP_STRENGTH = isMobile ? -5.0 : -5.5;     // Stronger flap on desktop
-  const TERMINAL_VELOCITY = isMobile ? 5.5 : 6.5;   // Higher terminal velocity on desktop
-  const PIPE_SPEED_BASE = isMobile ? 2.0 : 3.0;     // Faster pipes on desktop
-  const MAX_PIPE_SPEED = isMobile ? 4.0 : 6.0;      // Higher max speed on desktop
+  const GRAVITY = isMobile ? 0.18 : 0.22;
+  const FLAP_STRENGTH = isMobile ? -5.0 : -5.5;
+  const TERMINAL_VELOCITY = isMobile ? 5.5 : 6.5;
+  
+  const START_PIPE_SPEED = 1.8;
+  const MAX_PIPE_SPEED = 4.5;
+  const SPEED_INC = 0.08;
+  
+  const START_SPAWN_INTERVAL = 2200;
+  const MIN_SPAWN_INTERVAL = 1400;
+  
   const PIPE_WIDTH = 52;
-  const PIPE_SPAWN_INTERVAL = isMobile ? 2500 : 1500; // More frequent pipes on desktop
   const NOTE_SIZE = 40;
   const HIGH_SCORE_KEY = 'neela_tap_highscore';
 
@@ -221,13 +300,24 @@
     lastPipeTimestamp: 0,
     gameStartTimestamp: null,
     lastFrameTimestamp: 0,
-    pipeSpeed: PIPE_SPEED_BASE,
+    pipeSpeed: START_PIPE_SPEED,
+    spawnInterval: START_SPAWN_INTERVAL,
     gameWidth: 0,
     gameHeight: 0,
     animationId: null,
     bgTexts: [],
     particles: [],
     lastParticleFrame: 0,
+    // Boss State
+    boss1Active: false,
+    boss1Triggered: false,
+    boss2Active: false,
+    boss2Triggered: false,
+    bossWall: null,
+    bossGhost: null,
+    ghostBuffer: [],
+    bossStartTime: 0,
+    gravityPaused: false
   };
 
   let elements = {};
@@ -502,6 +592,20 @@
     detachGameInputs();
     clearPipes();
     clearParticles();
+    
+    // Boss cleanup
+    if (gameState.bossWall) {
+      gameState.bossWall.element.remove();
+      gameState.bossWall = null;
+    }
+    if (gameState.bossGhost) {
+      gameState.bossGhost.element.remove();
+      gameState.bossGhost = null;
+    }
+    stopGhostAudio();
+    resetBossUI();
+    document.querySelectorAll('.neela-boss-banner, .neela-flash-text').forEach(el => el.remove());
+
     elements.note.style.display = 'none';
     elements.scoreDisplay.style.display = 'none';
     elements.gameOver.classList.remove('active');
@@ -551,8 +655,9 @@
 
     updateNote(timestamp, timeScale);
     updatePipes(timestamp, timeScale);
+    updateBosses(timestamp, timeScale);
     updateParticles();
-    updateBackgroundTexts(timeScale);
+    // Background text movement is now handled by CSS animations for performance
     checkCollisions();
 
     if (gameState.isPlaying) {
@@ -565,7 +670,12 @@
   }
 
   function updateNote(timestamp, timeScale) {
-    gameState.noteVelocity += GRAVITY * timeScale;
+    if (!gameState.gravityPaused) {
+      gameState.noteVelocity += GRAVITY * timeScale;
+    } else {
+      gameState.noteVelocity = 0;
+    }
+    
     if (gameState.noteVelocity > TERMINAL_VELOCITY) {
       gameState.noteVelocity = TERMINAL_VELOCITY;
     }
@@ -593,20 +703,18 @@
   }
 
   function spawnParticle(x, y) {
-    if (gameState.particles.length > 8) { // Reduce particle count for performance
+    if (gameState.particles.length > 12) {
       const p = gameState.particles.shift();
       if (p && p.element && p.element.parentNode) p.element.remove();
     }
     
     const div = document.createElement('div');
     div.className = 'neela-particle';
-    div.style.left = '0px'; 
-    div.style.top = '0px';
     div.style.transform = `translate(${x - 3}px, ${y - 3}px)`;
     elements.canvas.appendChild(div);
     
-    // Animation via JS for zero-layout-impact on low-end phones
-    // Using simple opacity fade + scale
+    // Performance optimization: use CSS animationend for cleanup if possible, 
+    // but here we use a controlled frame-based approach or short timeout for strict count
     let opacity = 0.8;
     let scale = 1;
     let ty = 0;
@@ -635,19 +743,21 @@
   }
 
   function updatePipes(timestamp, timeScale) {
-    // Grace period: Don't spawn pipes in the first 500ms to let player get ready
-    const gracePeriod = 500;
-    const timeSinceStart = timestamp - (gameState.gameStartTimestamp || timestamp);
-    
-    if (timeSinceStart > gracePeriod && timestamp - gameState.lastPipeTimestamp >= PIPE_SPAWN_INTERVAL) {
-      spawnPipe();
-      gameState.lastPipeTimestamp = timestamp;
+    if (gameState.boss1Active && !gameState.bossWall) {
+      // Regular pipes clearing for boss 1
+    } else if (!gameState.boss1Active) {
+      const gracePeriod = 500;
+      const timeSinceStart = timestamp - (gameState.gameStartTimestamp || timestamp);
+      
+      if (timeSinceStart > gracePeriod && timestamp - gameState.lastPipeTimestamp >= gameState.spawnInterval) {
+        spawnPipe();
+        gameState.lastPipeTimestamp = timestamp;
+      }
     }
 
     for (let i = gameState.pipes.length - 1; i >= 0; i--) {
       const pipe = gameState.pipes[i];
       pipe.x -= gameState.pipeSpeed * timeScale;
-
       pipe.topElement.style.transform = `translateX(${pipe.x}px)`;
       pipe.bottomElement.style.transform = `translateX(${pipe.x}px)`;
 
@@ -659,17 +769,365 @@
         gameState.score++;
         updateScoreDisplay();
         playScoreSound();
+        checkBossTriggers();
         
-        const bonus = Math.floor(gameState.score / 5) * 0.1;
-        gameState.pipeSpeed = Math.min(PIPE_SPEED_BASE + bonus, MAX_PIPE_SPEED);
+        if (!gameState.boss1Active && !gameState.boss2Active) {
+          gameState.pipeSpeed = Math.min(START_PIPE_SPEED + (gameState.score * SPEED_INC), MAX_PIPE_SPEED);
+          const intervalReduc = Math.floor(gameState.score / 5) * 15;
+          gameState.spawnInterval = Math.max(START_SPAWN_INTERVAL - intervalReduc, MIN_SPAWN_INTERVAL);
+        }
       }
 
-      if (pipe.x + PIPE_WIDTH < 0) {
+      if (pipe.x + PIPE_WIDTH < -50) {
         if (pipe.topElement.parentNode) pipe.topElement.remove();
         if (pipe.bottomElement.parentNode) pipe.bottomElement.remove();
         gameState.pipes.splice(i, 1);
       }
     }
+  }
+
+  function checkBossTriggers() {
+    if (gameState.score === 30 && !gameState.boss1Triggered) {
+      triggerBoss1();
+    }
+    if (gameState.score === 40 && !gameState.boss2Triggered) {
+      triggerBoss2();
+    }
+  }
+
+  function triggerBoss1() {
+    gameState.boss1Triggered = true;
+    gameState.boss1Active = true;
+    
+    // Banner
+    showBossBanner("BOSS INCOMING", "THE BEATDROP WALL", "linear-gradient(to bottom, #8B0000, #FF2020)", "#FF4444");
+    
+    // Audio deep rumble
+    playBossIntroAudio(60, 180, 1.2, 'sawtooth');
+    
+    gameState.gravityPaused = true;
+    setTimeout(() => {
+      gameState.gravityPaused = false;
+      spawnBossWall();
+    }, 3000); // 1.2s builders + banner time
+  }
+
+  function spawnBossWall() {
+    const wall = document.createElement('div');
+    wall.className = 'neela-wall';
+    wall.style.height = '100%';
+    wall.style.backgroundColor = '#8B0000';
+    wall.style.boxShadow = 'inset 0 0 20px #FF4444, 0 0 40px #FF000088';
+    wall.style.right = '-100px';
+    wall.style.top = '0';
+    
+    // Inside lines
+    for(let i=0; i<3; i++) {
+      const line = document.createElement('div');
+      line.className = 'neela-wall-line';
+      line.style.left = (15 + i*15) + 'px';
+      line.style.backgroundColor = '#FF4444';
+      line.style.boxShadow = '0 0 10px #FF0000';
+      wall.appendChild(line);
+    }
+    
+    elements.canvas.appendChild(wall);
+    gameState.bossWall = {
+      element: wall,
+      x: gameState.gameWidth,
+      holdStarted: 0,
+      phase: 'entering', // entering, holding, exiting
+      gapY: gameState.gameHeight / 2
+    };
+    
+    elements.scoreDisplay.style.color = '#FF2020';
+    elements.canvas.style.boxShadow = 'inset 0 0 80px #FF000044';
+  }
+
+  function triggerBoss2() {
+    gameState.boss2Triggered = true;
+    gameState.boss2Active = true;
+    
+    showBossBanner("BOSS INCOMING", "THE ECHO GHOST", "linear-gradient(to bottom, #2D0059, #9B00FF)", "#CC88FF");
+    
+    // Eerie audio
+    playGhostIntroAudio();
+    
+    setTimeout(() => {
+      spawnGhost();
+    }, 1800);
+    
+    elements.scoreDisplay.style.color = '#9B00FF';
+    elements.canvas.style.boxShadow = 'inset 0 0 80px #9B00FF44';
+  }
+
+  function spawnGhost() {
+    const ghost = document.createElement('div');
+    ghost.className = 'neela-ghost';
+    ghost.innerHTML = elements.noteInner.innerHTML;
+    ghost.style.color = '#CC88FF';
+    ghost.style.filter = 'drop-shadow(0 0 12px #9B00FF) drop-shadow(0 0 24px #CC88FFAA)';
+    elements.canvas.appendChild(ghost);
+    
+    gameState.bossGhost = {
+      element: ghost,
+      spawnTime: performance.now(),
+      trailCounter: 0
+    };
+    gameState.ghostBuffer = [];
+  }
+
+  function showBossBanner(title, sub, gradient, textColor) {
+    const banner = document.createElement('div');
+    banner.className = 'neela-boss-banner';
+    banner.style.background = gradient;
+    banner.style.color = 'white';
+    banner.innerHTML = `<h2 style="color: ${textColor}">${title}</h2><p>${sub}</p>`;
+    elements.canvas.appendChild(banner);
+    
+    setTimeout(() => banner.classList.add('active'), 100);
+    setTimeout(() => {
+      banner.classList.remove('active');
+      setTimeout(() => banner.remove(), 600);
+    }, 1800 + 100);
+  }
+
+  function playBossIntroAudio(f1, f2, dur, type) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(f1, audioCtx.currentTime);
+    osc.frequency.linearRampToValueAtTime(f2, audioCtx.currentTime + dur);
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.2);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + dur);
+  }
+
+  function playGhostIntroAudio() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const lfo = audioCtx.createOscillator();
+    const lfoGain = audioCtx.createGain();
+    const gain = audioCtx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+    
+    lfo.frequency.setValueAtTime(5, audioCtx.currentTime);
+    lfoGain.gain.setValueAtTime(15, audioCtx.currentTime);
+    
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+    
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.8);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    lfo.start();
+    osc.start();
+    
+    gameState.ghostOsc = { osc, lfo, gain };
+  }
+
+  function stopGhostAudio() {
+    if (gameState.ghostOsc) {
+      gameState.ghostOsc.gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+      setTimeout(() => {
+        gameState.ghostOsc.osc.stop();
+        gameState.ghostOsc.lfo.stop();
+        gameState.ghostOsc = null;
+      }, 1000);
+    }
+  }
+
+  function updateBosses(timestamp, timeScale) {
+    if (gameState.bossWall) {
+      const wall = gameState.bossWall;
+      const gapHeight = 155;
+      
+      // Gap movement
+      const sin = Math.sin(timestamp * 0.0018);
+      const gapOffset = sin * (gameState.gameHeight * 0.28);
+      wall.gapY = (gameState.gameHeight / 2) + gapOffset;
+      
+      // Horizontal movement
+      if (wall.phase === 'entering') {
+        wall.x -= 2.2 * timeScale;
+        if (wall.x <= gameState.gameWidth / 2 - 30) {
+          wall.x = gameState.gameWidth / 2 - 30;
+          wall.phase = 'holding';
+          wall.holdStarted = timestamp;
+        }
+      } else if (wall.phase === 'holding') {
+        if (timestamp - wall.holdStarted > 4000) {
+          wall.phase = 'exiting';
+        }
+      } else if (wall.phase === 'exiting') {
+        wall.x -= 2.2 * timeScale;
+        if (wall.x < -100) {
+          // Survived
+          finishBoss1();
+        }
+      }
+      
+      wall.element.style.transform = `translateX(${wall.x}px)`;
+      
+      // Wall particles
+      if (Math.random() < 0.3) {
+        spawnWallParticle(wall.x + 60, Math.random() * gameState.gameHeight);
+      }
+      
+      // Wall sounds
+      if (!wall.lastSin) wall.lastSin = 0;
+      if (sin > 0.98 && wall.lastSin <= 0.98) playOscillator(880, 'sine', 0.05, 0.2);
+      if (sin < -0.98 && wall.lastSin >= -0.98) playOscillator(120, 'sine', 0.08, 0.3);
+      wall.lastSin = sin;
+    }
+    
+    if (gameState.bossGhost) {
+      const ghost = gameState.bossGhost;
+      const now = performance.now();
+      
+      // Buffer current note pos
+      gameState.ghostBuffer.push({ x: gameState.gameWidth * 0.2, y: gameState.noteY });
+      if (gameState.ghostBuffer.length > 90) {
+        const targetPos = gameState.ghostBuffer.shift();
+        ghost.element.style.transform = `translate(${targetPos.x}px, ${targetPos.y}px) rotate(${gameState.currentRotation}deg)`;
+        ghost.lastX = targetPos.x;
+        ghost.lastY = targetPos.y;
+      } else {
+        // Drifting start
+        const tx = gameState.gameWidth / 2;
+        const ty = gameState.gameHeight / 2 + Math.sin(now * 0.002) * 50;
+        ghost.element.style.transform = `translate(${tx}px, ${ty}px)`;
+        ghost.lastX = tx;
+        ghost.lastY = ty;
+      }
+      
+      // Trails
+      ghost.trailCounter++;
+      if (ghost.trailCounter >= 4) {
+        ghost.trailCounter = 0;
+        spawnGhostTrail(ghost.lastX, ghost.lastY);
+      }
+      
+      // Distance sound
+      const dx = (gameState.gameWidth * 0.2) - ghost.lastX;
+      const dy = gameState.noteY - ghost.lastY;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 80) playGhostWhoosh();
+
+      if (now - ghost.spawnTime > 18000) {
+        finishBoss2();
+      }
+    }
+  }
+
+  function spawnWallParticle(x, y) {
+    const p = document.createElement('div');
+    p.style.position = 'absolute';
+    p.style.width = '4px';
+    p.style.height = '4px';
+    p.style.backgroundColor = '#FF4444';
+    p.style.left = '0';
+    p.style.top = '0';
+    p.style.transform = `translate(${x}px, ${y}px)`;
+    p.style.zIndex = '5';
+    elements.canvas.appendChild(p);
+    
+    setTimeout(() => {
+      p.style.transition = 'transform 0.6s ease-out, opacity 0.6s';
+      p.style.transform = `translate(${x - 100}px, ${y + (Math.random()-0.5)*50}px)`;
+      p.style.opacity = '0';
+      setTimeout(() => p.remove(), 600);
+    }, 10);
+  }
+
+  function spawnGhostTrail(x, y) {
+    const trail = document.createElement('div');
+    trail.className = 'neela-ghost';
+    trail.innerHTML = elements.noteInner.innerHTML;
+    trail.style.color = '#CC88FF';
+    trail.style.opacity = '0.3';
+    trail.style.transform = `translate(${x}px, ${y}px) scale(0.8)`;
+    elements.canvas.appendChild(trail);
+    setTimeout(() => {
+      trail.style.transition = 'opacity 0.5s, transform 0.5s';
+      trail.style.opacity = '0';
+      trail.style.transform = `translate(${x}px, ${y}px) scale(0.5)`;
+      setTimeout(() => trail.remove(), 500);
+    }, 10);
+  }
+
+  function playGhostWhoosh() {
+    if (!audioCtx || gameState.lastWhoosh && Date.now() - gameState.lastWhoosh < 500) return;
+    gameState.lastWhoosh = Date.now();
+    const bufferSize = audioCtx.sampleRate * 0.15;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i=0; i<bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+    noise.connect(gain);
+    gain.connect(audioCtx.destination);
+    noise.start();
+  }
+
+  function finishBoss1() {
+    gameState.boss1Active = false;
+    if (gameState.bossWall) {
+      gameState.bossWall.element.remove();
+      gameState.bossWall = null;
+    }
+    playVictoryChime();
+    showFlashText("SURVIVED!", "#10b981");
+    resetBossUI();
+  }
+
+  function finishBoss2() {
+    gameState.boss2Active = false;
+    if (gameState.bossGhost) {
+      gameState.bossGhost.element.style.transition = 'opacity 1s';
+      gameState.bossGhost.element.style.opacity = '0';
+      const el = gameState.bossGhost.element;
+      setTimeout(() => el.remove(), 1000);
+      gameState.bossGhost = null;
+    }
+    stopGhostAudio();
+    playVictoryChime();
+    showFlashText("GHOST BANISHED!", "#9B00FF");
+    resetBossUI();
+  }
+
+  function resetBossUI() {
+    elements.scoreDisplay.style.color = '#e0d4ff';
+    elements.canvas.style.boxShadow = 'none';
+  }
+
+  function playVictoryChime() {
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+    notes.forEach((f, i) => {
+      setTimeout(() => playOscillator(f, 'sine', 0.1, 0.2), i * 100);
+    });
+  }
+
+  function showFlashText(text, color) {
+    const el = document.createElement('div');
+    el.className = 'neela-flash-text';
+    el.style.color = color;
+    el.textContent = text;
+    elements.canvas.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
   }
 
   function spawnPipe() {
@@ -775,6 +1233,42 @@
       };
 
       if (intersect(noteHitbox, topRect) || intersect(noteHitbox, botRect)) {
+        triggerGameOver();
+        return;
+      }
+    }
+
+    // Boss 1 Collision
+    if (gameState.bossWall && gameState.bossWall.phase !== 'exiting') {
+      const wallX = gameState.bossWall.x;
+      const wallW = 60;
+      const gapY = gameState.bossWall.gapY;
+      const gapH = 155;
+      
+      const left = gameState.gameWidth * 0.2 + 18;
+      const right = left + 40 - 36;
+      const top = gameState.noteY + 14;
+      const bottom = top + 40 - 28;
+
+      if (right > wallX && left < wallX + wallW) {
+        if (top < gapY - gapH/2 || bottom > gapY + gapH/2) {
+          triggerGameOver();
+          return;
+        }
+      }
+    }
+
+    // Boss 2 Collision
+    if (gameState.bossGhost && gameState.ghostBuffer.length >= 90) {
+      const ghostX = gameState.bossGhost.lastX;
+      const ghostY = gameState.bossGhost.lastY;
+      const noteX = gameState.gameWidth * 0.2;
+      
+      const shrink = 8;
+      const r1 = { left: noteX + shrink, right: noteX + 40 - shrink, top: gameState.noteY + shrink, bottom: gameState.noteY + 40 - shrink };
+      const r2 = { left: ghostX + shrink, right: ghostX + 40 - shrink, top: ghostY + shrink, bottom: ghostY + 40 - shrink };
+      
+      if (!(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom)) {
         triggerGameOver();
         return;
       }
