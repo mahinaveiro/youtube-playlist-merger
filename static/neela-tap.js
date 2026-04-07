@@ -219,6 +219,8 @@
     noteVelocity: 0,
     pipes: [],
     lastPipeTimestamp: 0,
+    gameStartTimestamp: null,
+    lastFrameTimestamp: 0,
     pipeSpeed: PIPE_SPEED_BASE,
     gameWidth: 0,
     gameHeight: 0,
@@ -567,14 +569,23 @@
 
     if (!gameState.gameStartTimestamp) {
       gameState.gameStartTimestamp = timestamp;
+      gameState.lastFrameTimestamp = timestamp;
     }
     
+    // Calculate delta time multiplier (1.0 for 60fps ~ 16.66ms per frame)
+    let deltaTime = timestamp - gameState.lastFrameTimestamp;
+    // Cap deltaTime to avoid massive jumps after lag or tab switch
+    if (deltaTime > 100) deltaTime = 100;
+    
+    const timeScale = deltaTime / 16.666;
+    gameState.lastFrameTimestamp = timestamp;
+
     if (!gameState.lastPipeTimestamp) gameState.lastPipeTimestamp = timestamp;
 
-    updateNote(timestamp);
-    updatePipes(timestamp);
+    updateNote(timestamp, timeScale);
+    updatePipes(timestamp, timeScale);
     updateParticles();
-    updateBackgroundTexts();
+    updateBackgroundTexts(timeScale);
     checkCollisions();
 
     if (gameState.isPlaying) {
@@ -586,12 +597,12 @@
     return (1 - amt) * start + amt * end;
   }
 
-  function updateNote(timestamp) {
-    gameState.noteVelocity += GRAVITY;
+  function updateNote(timestamp, timeScale) {
+    gameState.noteVelocity += GRAVITY * timeScale;
     if (gameState.noteVelocity > TERMINAL_VELOCITY) {
       gameState.noteVelocity = TERMINAL_VELOCITY;
     }
-    gameState.noteY += gameState.noteVelocity;
+    gameState.noteY += gameState.noteVelocity * timeScale;
 
     const currentX = gameState.gameWidth * 0.2;
     
@@ -607,7 +618,7 @@
 
     elements.note.style.transform = `translate(${currentX}px, ${gameState.noteY}px) rotate(${gameState.currentRotation}deg)`;
 
-    gameState.lastParticleFrame++;
+    gameState.lastParticleFrame += timeScale;
     if (gameState.lastParticleFrame > 5) {
       gameState.lastParticleFrame = 0;
       spawnParticle(currentX + NOTE_SIZE/2, gameState.noteY + NOTE_SIZE/2);
@@ -653,7 +664,7 @@
     gameState.particles = [];
   }
 
-  function updatePipes(timestamp) {
+  function updatePipes(timestamp, timeScale) {
     // Grace period: Don't spawn pipes in the first 500ms to let player get ready
     const gracePeriod = 500;
     const timeSinceStart = timestamp - (gameState.gameStartTimestamp || timestamp);
@@ -665,7 +676,7 @@
 
     for (let i = gameState.pipes.length - 1; i >= 0; i--) {
       const pipe = gameState.pipes[i];
-      pipe.x -= gameState.pipeSpeed;
+      pipe.x -= gameState.pipeSpeed * timeScale;
 
       pipe.topElement.style.transform = `translateX(${pipe.x}px)`;
       pipe.bottomElement.style.transform = `translateX(${pipe.x}px)`;
@@ -737,9 +748,9 @@
     gameState.pipes = [];
   }
 
-  function updateBackgroundTexts() {
+  function updateBackgroundTexts(timeScale) {
     gameState.bgTexts.forEach(text => {
-      text.x -= text.speed;
+      text.x -= text.speed * timeScale;
       
       // For background texts (not clouds), reset when completely off-screen to the left
       // This ensures they scroll all the way from right to left
