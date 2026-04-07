@@ -300,7 +300,7 @@
   const MAX_PIPE_SPEED = 5.0;     // Slightly higher max
   const SPEED_INC = 0.08;
   
-  const START_SPAWN_INTERVAL = 2200; // Reduced initial distance
+  const START_SPAWN_INTERVAL = isMobile ? 2200 : 2600; // Desktop gets more distance
   const MIN_SPAWN_INTERVAL = 1500;   // Minimum gap
   
   const PIPE_WIDTH = 52;
@@ -594,8 +594,9 @@
     
     gameState.pipeSpeed = START_PIPE_SPEED;
     gameState.spawnInterval = START_SPAWN_INTERVAL;
-    // Spawns first pipe after 1.2s instead of 3s
-    gameState.lastPipeTimestamp = performance.now() - (START_SPAWN_INTERVAL - 1200);
+    
+    // Spawns first pipe after 0.5s for immediate action
+    gameState.lastPipeTimestamp = -1; 
     
     gameState.boss1Score = 25 + Math.floor(Math.random() * 10); // Random score 25-35
     gameState.boss2Score = 40 + Math.floor(Math.random() * 15); // Random score 40-55
@@ -677,8 +678,14 @@
     if (!gameState.gameStartTimestamp) {
       gameState.gameStartTimestamp = timestamp;
       gameState.lastFrameTimestamp = timestamp;
-      // Initialize if still 0
-      if (!gameState.lastPipeTimestamp) gameState.lastPipeTimestamp = timestamp;
+      
+      // Initialize if still 0 or -1
+      if (gameState.lastPipeTimestamp === -1) {
+        // Prime it to spawn in 500ms
+        gameState.lastPipeTimestamp = timestamp - (gameState.spawnInterval - 500);
+      } else if (!gameState.lastPipeTimestamp) {
+        gameState.lastPipeTimestamp = timestamp;
+      }
     }
     
     // Calculate delta time multiplier (1.0 for 60fps ~ 16.66ms per frame)
