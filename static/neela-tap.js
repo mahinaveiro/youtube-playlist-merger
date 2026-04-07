@@ -357,6 +357,7 @@
           <p class="neela-credits">A Codanela Production</p>
           ${gameState.highScore > 0 ? `<p class="neela-high-score">Your Best: ${gameState.highScore}</p>` : ''}
           <div class="neela-tap-to-start" id="neela-tap-start">Tap to Start</div>
+          <button id="neela-test-skip" style="margin-top: 15px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #aaa; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 10px;">[TEST] Skip to 25 pts</button>
           <button class="neela-quit-btn" id="neela-quit-start">Quit</button>
         </div>
         
@@ -424,6 +425,7 @@
       quitStart: document.getElementById('neela-quit-start'),
       playAgain: document.getElementById('neela-play-again'),
       quitGame: document.getElementById('neela-quit-game'),
+      testSkip: document.getElementById('neela-test-skip'),
     };
   }
 
@@ -491,6 +493,14 @@
     elements.quitGame.addEventListener('click', quitGame);
     elements.readyBanner.addEventListener('click', handleMixReady);
     elements.muteBtn.addEventListener('click', toggleMusicMute);
+    if (elements.testSkip) {
+      elements.testSkip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startGame();
+        gameState.score = 25;
+        updateScoreDisplay();
+      });
+    }
     
     window.addEventListener('resize', handleResize);
     handleResize();
