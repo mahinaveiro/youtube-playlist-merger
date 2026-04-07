@@ -186,6 +186,29 @@
       opacity: 1;
       transform: translateY(0);
     }
+    .neela-note-wet {
+      filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.4)) brightness(1.1);
+    }
+    .neela-drip {
+      position: absolute;
+      width: 2px;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 50% 50% 30% 30%;
+      pointer-events: none;
+      z-index: 4;
+      will-change: transform, opacity;
+    }
+    .neela-splash-particle {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 4;
+      will-change: transform, opacity;
+    }
   `;
   document.head.appendChild(style);
 
@@ -659,6 +682,11 @@
     initAudio();
     gameState.noteVelocity = FLAP_STRENGTH;
     playFlapSound();
+    
+    // Splash effect if raining
+    if (gameState.weather === 'rain' || gameState.weather === 'thunder') {
+      spawnSplash(gameState.gameWidth * 0.2 + NOTE_SIZE/2, gameState.noteY + NOTE_SIZE/2);
+    }
   }
 
   function startGame() {
@@ -877,6 +905,72 @@
     if (gameState.lastParticleFrame > 5) {
       gameState.lastParticleFrame = 0;
       spawnParticle(currentX + NOTE_SIZE/2, gameState.noteY + NOTE_SIZE/2);
+    }
+
+    // Dripping effect if raining
+    if ((gameState.weather === 'rain' || gameState.weather === 'thunder') && Math.random() < 0.08) {
+      spawnDrip(currentX + Math.random() * NOTE_SIZE, gameState.noteY + NOTE_SIZE * 0.7);
+    }
+  }
+
+  function spawnDrip(x, y) {
+    const drip = document.createElement('div');
+    drip.className = 'neela-drip';
+    drip.style.left = `${x}px`;
+    drip.style.top = `${y}px`;
+    elements.canvas.appendChild(drip);
+    
+    let dy = 0;
+    let opacity = 0.6;
+    const speed = 4 + Math.random() * 3;
+    
+    const interval = setInterval(() => {
+      dy += speed;
+      opacity -= 0.015;
+      if (opacity <= 0 || y + dy > gameState.gameHeight) {
+        clearInterval(interval);
+        if (drip.parentNode) drip.remove();
+      } else {
+        drip.style.transform = `translateY(${dy}px)`;
+        drip.style.opacity = opacity;
+      }
+    }, 20);
+  }
+
+  function spawnSplash(x, y) {
+    const count = 8;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.random() * Math.PI) + Math.PI; // Upwards semi-circle
+      const speed = 2 + Math.random() * 4;
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed;
+      const grav = 0.15;
+      
+      const p = document.createElement('div');
+      p.className = 'neela-splash-particle';
+      p.style.left = `${x}px`;
+      p.style.top = `${y}px`;
+      elements.canvas.appendChild(p);
+      
+      let px = 0;
+      let py = 0;
+      let curVy = vy;
+      let opacity = 0.8;
+      
+      const interval = setInterval(() => {
+        px += vx;
+        curVy += grav;
+        py += curVy;
+        opacity -= 0.03;
+        
+        if (opacity <= 0) {
+          clearInterval(interval);
+          if (p.parentNode) p.remove();
+        } else {
+          p.style.transform = `translate(${px}px, ${py}px)`;
+          p.style.opacity = opacity;
+        }
+      }, 20);
     }
   }
 
@@ -1482,6 +1576,13 @@
       
       item.element.style.transform = transform;
     });
+
+    // Toggle wet look for note
+    if (gameState.weather === 'rain' || gameState.weather === 'thunder') {
+      elements.note.classList.add('neela-note-wet');
+    } else {
+      elements.note.classList.remove('neela-note-wet');
+    }
 
     // Thunder logic
     if (gameState.weather === 'thunder' && Math.random() < 0.005) {
