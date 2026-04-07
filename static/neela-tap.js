@@ -597,7 +597,7 @@
     
     // Position first pipe VERY close (45% across screen) for truly instant action
     spawnPipe(gameState.gameWidth * 0.45);
-    gameState.lastPipeTimestamp = timestamp || performance.now();
+    gameState.lastPipeTimestamp = performance.now();
     
     gameState.boss1Score = 25 + Math.floor(Math.random() * 10); // Random score 25-35
     gameState.boss2Score = 40 + Math.floor(Math.random() * 15); // Random score 40-55
