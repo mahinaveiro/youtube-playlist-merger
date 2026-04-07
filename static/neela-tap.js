@@ -107,6 +107,24 @@
       0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
       100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
     }
+    .neela-boss-pipe {
+      position: absolute;
+      width: 70px !important;
+      z-index: 10;
+      will-change: transform;
+      border-radius: 8px;
+    }
+    .neela-ghost-flare {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: rgba(0, 191, 255, 0.6);
+      box-shadow: 0 0 10px #00bfff, 0 0 20px #0000ff;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 8;
+      will-change: transform, opacity;
+    }
   `;
   document.head.appendChild(style);
 
@@ -282,8 +300,8 @@
   const MAX_PIPE_SPEED = 5.0;     // Slightly higher max
   const SPEED_INC = 0.08;
   
-  const START_SPAWN_INTERVAL = 3000; // Increased distance (3s gap between pipes)
-  const MIN_SPAWN_INTERVAL = 1600;   // Increased minimum gap
+  const START_SPAWN_INTERVAL = 2200; // Reduced initial distance
+  const MIN_SPAWN_INTERVAL = 1500;   // Minimum gap
   
   const PIPE_WIDTH = 52;
   const NOTE_SIZE = 40;
@@ -576,7 +594,8 @@
     
     gameState.pipeSpeed = START_PIPE_SPEED;
     gameState.spawnInterval = START_SPAWN_INTERVAL;
-    gameState.lastPipeTimestamp = 0;
+    // Spawns first pipe after 1.2s instead of 3s
+    gameState.lastPipeTimestamp = performance.now() - (START_SPAWN_INTERVAL - 1200);
     
     gameState.boss1Score = 25 + Math.floor(Math.random() * 10); // Random score 25-35
     gameState.boss2Score = 40 + Math.floor(Math.random() * 15); // Random score 40-55
@@ -611,7 +630,8 @@
     
     // Boss cleanup
     if (gameState.bossWall) {
-      gameState.bossWall.element.remove();
+      if (gameState.bossWall.topElement) gameState.bossWall.topElement.remove();
+      if (gameState.bossWall.bottomElement) gameState.bossWall.bottomElement.remove();
       gameState.bossWall = null;
     }
     if (gameState.bossGhost) {
@@ -657,17 +677,9 @@
     if (!gameState.gameStartTimestamp) {
       gameState.gameStartTimestamp = timestamp;
       gameState.lastFrameTimestamp = timestamp;
+      // Initialize if still 0
+      if (!gameState.lastPipeTimestamp) gameState.lastPipeTimestamp = timestamp;
     }
-    
-    // Calculate delta time multiplier (1.0 for 60fps ~ 16.66ms per frame)
-    let deltaTime = timestamp - gameState.lastFrameTimestamp;
-    // Cap deltaTime to avoid massive jumps after lag or tab switch
-    if (deltaTime > 100) deltaTime = 100;
-    
-    const timeScale = deltaTime / 16.666;
-    gameState.lastFrameTimestamp = timestamp;
-
-    if (!gameState.lastPipeTimestamp) gameState.lastPipeTimestamp = timestamp;
 
     updateNote(timestamp, timeScale);
     updatePipes(timestamp, timeScale);
@@ -828,27 +840,30 @@
   }
 
   function spawnBossWall() {
-    const wall = document.createElement('div');
-    wall.className = 'neela-wall';
-    wall.style.height = '100%';
-    wall.style.backgroundColor = '#8B0000';
-    wall.style.boxShadow = 'inset 0 0 20px #FF4444, 0 0 40px #FF000088';
-    wall.style.right = '-100px';
-    wall.style.top = '0';
+    const top = document.createElement('div');
+    top.className = 'neela-boss-pipe';
+    top.style.height = '1000px';
+    top.style.backgroundColor = '#8B0000';
+    top.style.boxShadow = 'inset 0 0 20px #FF4444, 0 0 40px #FF0000cc';
+    top.style.border = '2px solid #FF4444';
+    top.style.left = '0';
+    top.style.top = '0';
     
-    // Inside lines
-    for(let i=0; i<3; i++) {
-      const line = document.createElement('div');
-      line.className = 'neela-wall-line';
-      line.style.left = (15 + i*15) + 'px';
-      line.style.backgroundColor = '#FF4444';
-      line.style.boxShadow = '0 0 10px #FF0000';
-      wall.appendChild(line);
-    }
+    const bot = document.createElement('div');
+    bot.className = 'neela-boss-pipe';
+    bot.style.height = '1000px';
+    bot.style.backgroundColor = '#8B0000';
+    bot.style.boxShadow = 'inset 0 0 20px #FF4444, 0 0 40px #FF0000cc';
+    bot.style.border = '2px solid #FF4444';
+    bot.style.left = '0';
+    bot.style.top = '0';
     
-    elements.canvas.appendChild(wall);
+    elements.canvas.appendChild(top);
+    elements.canvas.appendChild(bot);
+    
     gameState.bossWall = {
-      element: wall,
+      topElement: top,
+      bottomElement: bot,
       x: gameState.gameWidth,
       holdStarted: 0,
       phase: 'entering', // entering, holding, exiting
@@ -856,7 +871,7 @@
     };
     
     elements.scoreDisplay.style.color = '#FF2020';
-    elements.canvas.style.boxShadow = 'inset 0 0 80px #FF000044';
+    elements.canvas.style.boxShadow = 'inset 0 0 100px #FF000066';
   }
 
   function triggerBoss2() {
@@ -880,14 +895,17 @@
     const ghost = document.createElement('div');
     ghost.className = 'neela-ghost';
     ghost.innerHTML = elements.noteInner.innerHTML;
-    ghost.style.color = '#CC88FF';
-    ghost.style.filter = 'drop-shadow(0 0 12px #9B00FF) drop-shadow(0 0 24px #CC88FFAA)';
+    // Replica color with blue-purple tint
+    ghost.style.color = '#b09eff';
+    ghost.style.opacity = '0.5';
+    ghost.style.filter = 'drop-shadow(0 0 15px #00bfff) drop-shadow(0 0 25px #0000ffaa)';
     elements.canvas.appendChild(ghost);
     
     gameState.bossGhost = {
       element: ghost,
       spawnTime: performance.now(),
-      trailCounter: 0
+      trailCounter: 0,
+      flareCounter: 0
     };
     gameState.ghostBuffer = [];
   }
@@ -987,12 +1005,12 @@
       } else if (wall.phase === 'exiting') {
         wall.x -= 2.2 * timeScale;
         if (wall.x < -100) {
-          // Survived
           finishBoss1();
         }
       }
       
-      wall.element.style.transform = `translateX(${wall.x}px)`;
+      wall.topElement.style.transform = `translate(${wall.x}px, ${wall.gapY - gapHeight/2 - 1000}px)`;
+      wall.bottomElement.style.transform = `translate(${wall.x}px, ${wall.gapY + gapHeight/2}px)`;
       
       // Wall particles
       if (Math.random() < 0.3) {
@@ -1028,9 +1046,16 @@
       
       // Trails
       ghost.trailCounter++;
-      if (ghost.trailCounter >= 4) {
+      if (ghost.trailCounter >= 3) {
         ghost.trailCounter = 0;
         spawnGhostTrail(ghost.lastX, ghost.lastY);
+      }
+      
+      // Blue Flares
+      ghost.flareCounter++;
+      if (ghost.flareCounter >= 5) {
+        ghost.flareCounter = 0;
+        spawnGhostFlare(ghost.lastX + 20, ghost.lastY + 20);
       }
       
       // Distance sound
@@ -1069,15 +1094,32 @@
     const trail = document.createElement('div');
     trail.className = 'neela-ghost';
     trail.innerHTML = elements.noteInner.innerHTML;
-    trail.style.color = '#CC88FF';
-    trail.style.opacity = '0.3';
-    trail.style.transform = `translate(${x}px, ${y}px) scale(0.8)`;
+    trail.style.color = '#00bfff';
+    trail.style.opacity = '0.25';
+    trail.style.transform = `translate(${x}px, ${y}px) scale(0.85)`;
     elements.canvas.appendChild(trail);
     setTimeout(() => {
-      trail.style.transition = 'opacity 0.5s, transform 0.5s';
+      trail.style.transition = 'opacity 0.6s, transform 0.6s';
       trail.style.opacity = '0';
-      trail.style.transform = `translate(${x}px, ${y}px) scale(0.5)`;
-      setTimeout(() => trail.remove(), 500);
+      trail.style.transform = `translate(${x}px, ${y}px) scale(0.6)`;
+      setTimeout(() => trail.remove(), 600);
+    }, 10);
+  }
+
+  function spawnGhostFlare(x, y) {
+    const flare = document.createElement('div');
+    flare.className = 'neela-ghost-flare';
+    flare.style.transform = `translate(${x}px, ${y}px)`;
+    elements.canvas.appendChild(flare);
+    
+    const tx = x + (Math.random() - 0.5) * 100;
+    const ty = y + (Math.random() - 0.5) * 100;
+    
+    setTimeout(() => {
+      flare.style.transition = 'transform 1s ease-out, opacity 1s';
+      flare.style.transform = `translate(${tx}px, ${ty}px) scale(0)`;
+      flare.style.opacity = '0';
+      setTimeout(() => flare.remove(), 1000);
     }, 10);
   }
 
@@ -1101,7 +1143,8 @@
   function finishBoss1() {
     gameState.boss1Active = false;
     if (gameState.bossWall) {
-      gameState.bossWall.element.remove();
+      if (gameState.bossWall.topElement) gameState.bossWall.topElement.remove();
+      if (gameState.bossWall.bottomElement) gameState.bossWall.bottomElement.remove();
       gameState.bossWall = null;
     }
     playVictoryChime();
@@ -1256,7 +1299,7 @@
     // Boss 1 Collision
     if (gameState.bossWall && gameState.bossWall.phase !== 'exiting') {
       const wallX = gameState.bossWall.x;
-      const wallW = 60;
+      const wallW = 70;
       const gapY = gameState.bossWall.gapY;
       const gapH = 155;
       
