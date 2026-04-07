@@ -316,7 +316,8 @@
     bossWall: null,
     bossGhost: null,
     ghostBuffer: [],
-    bossStartTime: 0,
+    boss1Score: 0,
+    boss2Score: 0,
     gravityPaused: false
   };
 
@@ -567,6 +568,9 @@
     gameState.spawnInterval = START_SPAWN_INTERVAL;
     gameState.lastPipeTimestamp = 0;
     
+    gameState.boss1Score = 25 + Math.floor(Math.random() * 10); // Random score 25-35
+    gameState.boss2Score = 40 + Math.floor(Math.random() * 15); // Random score 40-55
+    
     updateScoreDisplay();
     attachGameInputs();
     
@@ -789,10 +793,10 @@
   }
 
   function checkBossTriggers() {
-    if (gameState.score === 30 && !gameState.boss1Triggered) {
+    if (gameState.score === gameState.boss1Score && !gameState.boss1Triggered) {
       triggerBoss1();
     }
-    if (gameState.score === 40 && !gameState.boss2Triggered) {
+    if (gameState.score === gameState.boss2Score && !gameState.boss2Triggered) {
       triggerBoss2();
     }
   }
@@ -807,11 +811,10 @@
     // Audio deep rumble
     playBossIntroAudio(60, 180, 1.2, 'sawtooth');
     
-    gameState.gravityPaused = true;
+    // NO FREEZING - Player keeps control
     setTimeout(() => {
-      gameState.gravityPaused = false;
       spawnBossWall();
-    }, 3000); // 1.2s builders + banner time
+    }, 3000); 
   }
 
   function spawnBossWall() {
