@@ -491,10 +491,12 @@
       playAgain: document.getElementById('neela-play-again'),
       quitGame: document.getElementById('neela-quit-game'),
       testSkip: document.getElementById('neela-test-skip'),
-      rainLayer: createWeatherLayer('rain'),
-      snowLayer: createWeatherLayer('snow'),
-      thunderFlash: createThunderFlash()
     };
+    
+    // Initialize weather layers after elements object is defined
+    elements.rainLayer = createWeatherLayer('rain');
+    elements.snowLayer = createWeatherLayer('snow');
+    elements.thunderFlash = createThunderFlash();
   }
 
   function createWeatherLayer(type) {
