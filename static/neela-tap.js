@@ -680,6 +680,14 @@
       // Initialize if still 0
       if (!gameState.lastPipeTimestamp) gameState.lastPipeTimestamp = timestamp;
     }
+    
+    // Calculate delta time multiplier (1.0 for 60fps ~ 16.66ms per frame)
+    let deltaTime = timestamp - gameState.lastFrameTimestamp;
+    // Cap deltaTime to avoid massive jumps after lag or tab switch
+    if (deltaTime > 100) deltaTime = 100;
+    
+    const timeScale = deltaTime / 16.666;
+    gameState.lastFrameTimestamp = timestamp;
 
     updateNote(timestamp, timeScale);
     updatePipes(timestamp, timeScale);
