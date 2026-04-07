@@ -599,6 +599,15 @@
     spawnPipe(gameState.gameWidth * 0.45);
     gameState.lastPipeTimestamp = performance.now();
     
+    // Reset Boss State
+    gameState.boss1Active = false;
+    gameState.boss1Triggered = false;
+    gameState.boss2Active = false;
+    gameState.boss2Triggered = false;
+    gameState.bossWall = null;
+    gameState.bossGhost = null;
+    gameState.ghostBuffer = [];
+    
     gameState.boss1Score = 25 + Math.floor(Math.random() * 10); // Random score 25-35
     gameState.boss2Score = 40 + Math.floor(Math.random() * 15); // Random score 40-55
     
