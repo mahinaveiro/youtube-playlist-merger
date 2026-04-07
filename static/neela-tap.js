@@ -31,7 +31,7 @@
       pointer-events: none;
       z-index: 4;
       opacity: 0.8;
-      transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+      will-change: transform, opacity;
     }
   `;
   document.head.appendChild(style);
@@ -444,53 +444,20 @@
   function startGame() {
     initAudio();
     
-    // Force resize calculation BEFORE showing countdown
+    // Position note immediately with correct dimensions
     elements.startScreen.style.display = 'none';
     handleResize();
     
-    // Show countdown overlay
-    elements.countdown.classList.add('active');
     elements.note.style.display = 'block';
-    elements.scoreDisplay.style.display = 'none';
+    elements.scoreDisplay.style.display = 'block';
     
-    // Position note immediately with correct dimensions
     gameState.noteY = gameState.gameHeight / 2 - NOTE_SIZE / 2;
     gameState.noteVelocity = 0;
     gameState.currentRotation = 0;
     const initialX = gameState.gameWidth * 0.2;
     elements.note.style.transform = `translate(${initialX}px, ${gameState.noteY}px) rotate(0deg)`;
-    void elements.note.offsetHeight;
     
-    // Countdown sequence: 3... 2... 1... GO!
-    let count = 3;
-    elements.countdownNumber.textContent = count;
-    elements.countdownNumber.className = 'neela-countdown-number';
-    void elements.countdownNumber.offsetWidth;
-    elements.countdownNumber.classList.add('neela-countdown-animate');
-    
-    playOscillator(440, 'sine', 0.1, 0.3);
-    
-    const countdownInterval = setInterval(() => {
-      count--;
-      
-      if (count > 0) {
-        elements.countdownNumber.textContent = count;
-        elements.countdownNumber.className = 'neela-countdown-number';
-        void elements.countdownNumber.offsetWidth;
-        elements.countdownNumber.classList.add('neela-countdown-animate');
-        playOscillator(440, 'sine', 0.1, 0.3);
-      } else if (count === 0) {
-        elements.countdownNumber.textContent = 'GO!';
-        elements.countdownNumber.className = 'neela-countdown-number neela-countdown-go';
-        void elements.countdownNumber.offsetWidth;
-        elements.countdownNumber.classList.add('neela-countdown-animate');
-        playOscillator(660, 'sine', 0.15, 0.4);
-      } else {
-        clearInterval(countdownInterval);
-        elements.countdown.classList.remove('active');
-        actuallyStartGame();
-      }
-    }, 1000);
+    actuallyStartGame();
   }
   
   function actuallyStartGame() {
@@ -626,35 +593,38 @@
   }
 
   function spawnParticle(x, y) {
-    if (gameState.particles.length > 15) {
+    if (gameState.particles.length > 8) { // Reduce particle count for performance
       const p = gameState.particles.shift();
       if (p && p.element && p.element.parentNode) p.element.remove();
     }
     
     const div = document.createElement('div');
     div.className = 'neela-particle';
-    div.style.left = `${x - 3}px`; 
-    div.style.top = `${y - 3}px`;
+    div.style.left = '0px'; 
+    div.style.top = '0px';
+    div.style.transform = `translate(${x - 3}px, ${y - 3}px)`;
     elements.canvas.appendChild(div);
     
-    void div.offsetWidth; // Force reflow
+    // Animation via JS for zero-layout-impact on low-end phones
+    // Using simple opacity fade + scale
+    let opacity = 0.8;
+    let scale = 1;
+    let ty = 0;
     
-    div.style.transform = 'translateY(15px) scale(0)';
-    div.style.opacity = '0';
+    const pInterval = setInterval(() => {
+      opacity -= 0.08;
+      scale -= 0.1;
+      ty += 1.5;
+      if (opacity <= 0) {
+        clearInterval(pInterval);
+        if (div.parentNode) div.remove();
+      } else {
+        div.style.opacity = opacity;
+        div.style.transform = `translate(${x - 3}px, ${y - 3 + ty}px) scale(${scale})`;
+      }
+    }, 30);
     
-    // Store particle ref safely
-    const particleState = {
-      element: div,
-      createdAt: performance.now()
-    };
-    
-    gameState.particles.push(particleState);
-    
-    setTimeout(() => {
-      if (div && div.parentNode) div.remove();
-      const idx = gameState.particles.indexOf(particleState);
-      if (idx !== -1) gameState.particles.splice(idx, 1);
-    }, 500);
+    gameState.particles.push({ element: div });
   }
 
   function clearParticles() {
@@ -752,17 +722,15 @@
     gameState.bgTexts.forEach(text => {
       text.x -= text.speed * timeScale;
       
-      // For background texts (not clouds), reset when completely off-screen to the left
-      // This ensures they scroll all the way from right to left
       if (text.isCloud) {
-        if (text.x < -10) text.x = 110;
+        if (text.x < -20) text.x = 120;
       } else {
-        // For text elements, reset when they've scrolled completely off the left side
-        // Use -50 to ensure text fully exits before looping
-        if (text.x < -50) text.x = 150;
+        if (text.x < -60) text.x = 160;
       }
       
-      text.element.style.left = `${text.x}%`;
+      // OPTIMIZED: Use translate() instead of left!
+      // This is a massive performance win for 4GB ram phones
+      text.element.style.transform = `translateX(${text.x}vw)`;
     });
   }
 
