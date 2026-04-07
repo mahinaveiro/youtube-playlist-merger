@@ -125,6 +125,48 @@
       z-index: 8;
       will-change: transform, opacity;
     }
+    .neela-weather-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0;
+      transition: opacity 2.5s ease;
+      overflow: hidden;
+    }
+    .neela-weather-layer.active {
+      opacity: 1;
+    }
+    .neela-rain-drop {
+      position: absolute;
+      width: 2px;
+      height: 15px;
+      background: rgba(255, 255, 255, 0.4);
+      top: -20px;
+    }
+    .neela-snow-flake {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: white;
+      border-radius: 50%;
+      top: -10px;
+      opacity: 0.8;
+    }
+    .neela-thunder-flash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: white;
+      opacity: 0;
+      z-index: 60;
+      pointer-events: none;
+    }
   `;
   document.head.appendChild(style);
 
@@ -336,7 +378,12 @@
     ghostBuffer: [],
     boss1Score: 0,
     boss2Score: 0,
-    gravityPaused: false
+    gravityPaused: false,
+    // Weather State
+    weather: 'clear',
+    lastWeatherScore: 0,
+    nextWeatherAt: 8,
+    weatherElements: []
   };
 
   let elements = {};
@@ -444,7 +491,24 @@
       playAgain: document.getElementById('neela-play-again'),
       quitGame: document.getElementById('neela-quit-game'),
       testSkip: document.getElementById('neela-test-skip'),
+      rainLayer: createWeatherLayer('rain'),
+      snowLayer: createWeatherLayer('snow'),
+      thunderFlash: createThunderFlash()
     };
+  }
+
+  function createWeatherLayer(type) {
+    const layer = document.createElement('div');
+    layer.className = `neela-weather-layer neela-weather-${type}`;
+    elements.canvas.appendChild(layer);
+    return layer;
+  }
+
+  function createThunderFlash() {
+    const flash = document.createElement('div');
+    flash.className = 'neela-thunder-flash';
+    elements.canvas.appendChild(flash);
+    return flash;
   }
 
   function createBackgroundTexts() {
@@ -483,6 +547,11 @@
       { top: 15, left: 20, size: 60 },
       { top: 25, left: 70, size: 80 },
       { top: 10, left: 50, size: 50 },
+      { top: 35, left: 10, size: 70 },
+      { top: 5, left: 85, size: 55 },
+      { top: 45, left: 90, size: 65 },
+      { top: 15, left: 40, size: 90 },
+      { top: 30, left: 60, size: 50 },
     ];
     cloudPositions.forEach((pos, index) => {
       const cloud = document.createElement('div');
@@ -492,7 +561,7 @@
       cloud.style.width = `${pos.size}px`;
       cloud.style.height = `${pos.size * 0.6}px`;
       elements.canvas.appendChild(cloud);
-      gameState.bgTexts.push({ element: cloud, x: pos.left, speed: 0.05 + index * 0.02, isCloud: true });
+      gameState.bgTexts.push({ element: cloud, x: pos.left, speed: 0.03 + index * 0.01, isCloud: true });
     });
   }
 
@@ -611,6 +680,14 @@
     gameState.boss1Score = 25 + Math.floor(Math.random() * 10); // Random score 25-35
     gameState.boss2Score = 40 + Math.floor(Math.random() * 15); // Random score 40-55
     
+    // Reset Weather
+    gameState.weather = 'clear';
+    gameState.lastWeatherScore = 0;
+    gameState.nextWeatherAt = 7 + Math.floor(Math.random() * 5);
+    clearWeatherElements();
+    elements.rainLayer.classList.remove('active');
+    elements.snowLayer.classList.remove('active');
+    
     updateScoreDisplay();
     attachGameInputs();
     
@@ -705,6 +782,7 @@
     updateNote(timestamp, timeScale);
     updatePipes(timestamp, timeScale);
     updateBosses(timestamp, timeScale);
+    updateWeather(timestamp, timeScale);
     updateParticles();
     // Background text movement is now handled by CSS animations for performance
     checkCollisions();
@@ -819,6 +897,7 @@
         updateScoreDisplay();
         playScoreSound();
         checkBossTriggers();
+        checkWeatherTriggers();
         
         if (!gameState.boss1Active && !gameState.boss2Active) {
           gameState.pipeSpeed = Math.min(START_PIPE_SPEED + (gameState.score * SPEED_INC), MAX_PIPE_SPEED);
@@ -1258,10 +1337,101 @@
         if (text.x < -60) text.x = 160;
       }
       
-      // OPTIMIZED: Use translate() instead of left!
-      // This is a massive performance win for 4GB ram phones
       text.element.style.transform = `translateX(${text.x}vw)`;
     });
+  }
+
+  function checkWeatherTriggers() {
+    if (gameState.score >= gameState.lastWeatherScore + gameState.nextWeatherAt) {
+      changeWeather();
+    }
+  }
+
+  function changeWeather() {
+    const cycle = ['clear', 'rain', 'thunder', 'snow'];
+    const currentIndex = cycle.indexOf(gameState.weather);
+    const nextIndex = (currentIndex + 1) % cycle.length;
+    
+    gameState.weather = cycle[nextIndex];
+    gameState.lastWeatherScore = gameState.score;
+    gameState.nextWeatherAt = 7 + Math.floor(Math.random() * 5); // 7 to 11 points
+    
+    // Update visual layers
+    elements.rainLayer.classList.remove('active');
+    elements.snowLayer.classList.remove('active');
+    
+    if (gameState.weather === 'rain' || gameState.weather === 'thunder') {
+      elements.rainLayer.classList.add('active');
+      for(let i=0; i<30; i++) spawnWeatherElement('rain');
+    } else if (gameState.weather === 'snow') {
+      elements.snowLayer.classList.add('active');
+      for(let i=0; i<40; i++) spawnWeatherElement('snow');
+    } else {
+      clearWeatherElements();
+    }
+  }
+
+  function spawnWeatherElement(type) {
+    const el = document.createElement('div');
+    el.className = type === 'rain' ? 'neela-rain-drop' : 'neela-snow-flake';
+    
+    const x = Math.random() * gameState.gameWidth;
+    const y = Math.random() * gameState.gameHeight - gameState.gameHeight;
+    const speed = type === 'rain' ? 10 + Math.random() * 10 : 2 + Math.random() * 3;
+    
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    
+    const targetLayer = type === 'rain' ? elements.rainLayer : elements.snowLayer;
+    targetLayer.appendChild(el);
+    
+    gameState.weatherElements.push({
+      element: el,
+      x: x,
+      y: y,
+      speed: speed,
+      type: type,
+      sinOffset: Math.random() * 10
+    });
+  }
+
+  function clearWeatherElements() {
+    gameState.weatherElements.forEach(item => item.element.remove());
+    gameState.weatherElements = [];
+  }
+
+  function updateWeather(timestamp, timeScale) {
+    gameState.weatherElements.forEach(item => {
+      item.y += item.speed * timeScale;
+      
+      let xOffset = 0;
+      if (item.type === 'snow') {
+        xOffset = Math.sin(timestamp * 0.002 + item.sinOffset) * 20;
+      }
+      
+      if (item.y > gameState.gameHeight) {
+        item.y = -20;
+        item.x = Math.random() * gameState.gameWidth;
+      }
+      
+      item.element.style.transform = `translate(${xOffset}px, ${item.y}px)`;
+      item.element.style.left = `${item.x}px`;
+    });
+
+    // Thunder logic
+    if (gameState.weather === 'thunder' && Math.random() < 0.005) {
+      triggerThunder();
+    }
+  }
+
+  function triggerThunder() {
+    elements.thunderFlash.style.opacity = '0.8';
+    playOscillator(100, 'sawtooth', 0.5, 0.2, 50, 0.5);
+    setTimeout(() => elements.thunderFlash.style.opacity = '0', 50);
+    setTimeout(() => {
+      elements.thunderFlash.style.opacity = '0.4';
+      setTimeout(() => elements.thunderFlash.style.opacity = '0', 30);
+    }, 100);
   }
 
   function updateParticles() {
