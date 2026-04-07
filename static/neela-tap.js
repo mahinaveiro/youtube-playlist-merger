@@ -784,9 +784,10 @@
       return; // Skip collision check this frame
     }
     
-    // In favor of the player: significantly shrink the hitbox so it only fails if clearly touching
-    const shrinkX = 12; // More leeway horizontally
-    const shrinkY = 8;  // More leeway vertically
+    // MUCH more forgiving: only trigger if the center of the note clearly overlaps
+    // This allows the "empty" space of the note SVG to graze the pipe without losing
+    const shrinkX = 18; // Very narrow horizontal hitbox
+    const shrinkY = 14;  // Low vertical hitbox
     const noteHitbox = {
       left: noteRect.left + shrinkX,
       right: noteRect.right - shrinkX,
