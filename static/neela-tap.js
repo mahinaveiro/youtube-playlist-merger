@@ -405,8 +405,7 @@
     boss2Active: false,
     boss2Triggered: false,
     bossWall: null,
-    bossGhost: null,
-    ghostBuffer: [],
+    bossGhosts: [],
     boss1Score: 0,
     boss2Score: 0,
     gravityPaused: false,
@@ -726,8 +725,7 @@
     gameState.boss2Active = false;
     gameState.boss2Triggered = false;
     gameState.bossWall = null;
-    gameState.bossGhost = null;
-    gameState.ghostBuffer = [];
+    gameState.bossGhosts = [];
     
     gameState.boss1Score = 25 + Math.floor(Math.random() * 10); // Random score 25-35
     gameState.boss2Score = 40 + Math.floor(Math.random() * 15); // Random score 40-55
@@ -776,10 +774,9 @@
       if (gameState.bossWall.bottomElement) gameState.bossWall.bottomElement.remove();
       gameState.bossWall = null;
     }
-    if (gameState.bossGhost) {
-      gameState.bossGhost.element.remove();
-      gameState.bossGhost = null;
-    }
+    gameState.bossGhosts.forEach(g => g.element.remove());
+    gameState.bossGhosts = [];
+    
     stopGhostAudio();
     resetBossUI();
     document.querySelectorAll('.neela-boss-banner, .neela-flash-text').forEach(el => el.remove());
@@ -1030,37 +1027,44 @@
   function triggerBoss2() {
     gameState.boss2Triggered = true;
     gameState.boss2Active = true;
+    gameState.ghostSpawnCount = 0;
+    gameState.lastGhostSpawn = 0;
     
-    showBossBanner("BOSS INCOMING", "THE ECHO GHOST", "linear-gradient(to bottom, #2D0059, #9B00FF)", "#CC88FF");
-    
-    // Eerie audio
-    playGhostIntroAudio();
-    
-    setTimeout(() => {
-      spawnGhost();
-    }, 1800);
+    showBossBanner("BOSS INCOMING", "THE GHOST HORDE", "linear-gradient(to bottom, #2D0059, #9B00FF)", "#CC88FF");
     
     elements.scoreDisplay.style.color = '#9B00FF';
     elements.canvas.style.boxShadow = 'inset 0 0 80px #9B00FF44';
+    
+    // Auto-finish after 20s
+    setTimeout(() => {
+       if (gameState.boss2Active) finishBoss2();
+    }, 20000);
   }
 
-  function spawnGhost() {
+  function spawnAttackingGhost() {
     const ghost = document.createElement('div');
     ghost.className = 'neela-ghost';
     ghost.innerHTML = elements.noteInner.innerHTML;
-    // Replica color with blue-purple tint
     ghost.style.color = '#b09eff';
-    ghost.style.opacity = '0.5';
-    ghost.style.filter = 'drop-shadow(0 0 15px #00bfff) drop-shadow(0 0 25px #0000ffaa)';
+    ghost.style.opacity = '0.7';
+    ghost.style.filter = 'drop-shadow(0 0 10px #00bfff)';
+    
+    const side = Math.random() < 0.5 ? 'left' : 'right';
+    const x = side === 'left' ? -50 : gameState.gameWidth + 50;
+    const y = Math.random() * (gameState.gameHeight * 0.8) + (gameState.gameHeight * 0.1);
+    const speed = (3.5 + Math.random() * 2.5) * (side === 'left' ? 1 : -1);
+    
     elements.canvas.appendChild(ghost);
     
-    gameState.bossGhost = {
+    gameState.bossGhosts.push({
       element: ghost,
-      spawnTime: performance.now(),
-      trailCounter: 0,
-      flareCounter: 0
-    };
-    gameState.ghostBuffer = [];
+      x: x,
+      y: y,
+      speed: speed,
+      trailCounter: 0
+    });
+    
+    gameState.ghostSpawnCount++;
   }
 
   function showBossBanner(title, sub, gradient, textColor) {
@@ -1095,42 +1099,11 @@
   }
 
   function playGhostIntroAudio() {
-    if (!audioCtx) return;
-    const osc = audioCtx.createOscillator();
-    const lfo = audioCtx.createOscillator();
-    const lfoGain = audioCtx.createGain();
-    const gain = audioCtx.createGain();
-    
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(220, audioCtx.currentTime);
-    
-    lfo.frequency.setValueAtTime(5, audioCtx.currentTime);
-    lfoGain.gain.setValueAtTime(15, audioCtx.currentTime);
-    
-    lfo.connect(lfoGain);
-    lfoGain.connect(osc.frequency);
-    
-    gain.gain.setValueAtTime(0, audioCtx.currentTime);
-    gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.8);
-    
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    
-    lfo.start();
-    osc.start();
-    
-    gameState.ghostOsc = { osc, lfo, gain };
+    // Ghost sound effect was requested to be removed
   }
 
   function stopGhostAudio() {
-    if (gameState.ghostOsc) {
-      gameState.ghostOsc.gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
-      setTimeout(() => {
-        gameState.ghostOsc.osc.stop();
-        gameState.ghostOsc.lfo.stop();
-        gameState.ghostOsc = null;
-      }, 1000);
-    }
+    // Ghost sound effect was requested to be removed
   }
 
   function updateBosses(timestamp, timeScale) {
@@ -1166,53 +1139,34 @@
       wall.lastSin = sin;
     }
     
-    if (gameState.bossGhost) {
-      const ghost = gameState.bossGhost;
+    if (gameState.boss2Active) {
       const now = performance.now();
+      if (now - gameState.lastGhostSpawn > 2000) { // Spawn every 2s
+        spawnAttackingGhost();
+        gameState.lastGhostSpawn = now;
+      }
       
-      // Buffer current note pos
-      gameState.ghostBuffer.push({ x: gameState.gameWidth * 0.2, y: gameState.noteY });
-      if (gameState.ghostBuffer.length > 120) { // Increased delay to 2s
-        const targetPos = gameState.ghostBuffer.shift();
-        // Shift ghost horizontally to be slightly behind the player
-        const ghostX = targetPos.x - 30; 
-        ghost.element.style.transform = `translate(${ghostX}px, ${targetPos.y}px) rotate(${gameState.currentRotation}deg)`;
-        ghost.lastX = ghostX;
-        ghost.lastY = targetPos.y;
-      } else {
-        // Drifting entrance from right
-        const startX = gameState.gameWidth + 100;
-        const noteX = (gameState.gameWidth * 0.2) - 30; // Target behind player
-        const driftProgress = Math.min(1, (now - ghost.spawnTime) / 4000); // Slower 4s drift in
+      for (let i = gameState.bossGhosts.length - 1; i >= 0; i--) {
+        const ghost = gameState.bossGhosts[i];
+        ghost.x += ghost.speed * timeScale;
         
-        ghost.lastX = lerp(startX, noteX, driftProgress);
-        ghost.lastY = gameState.gameHeight / 2 + Math.sin(now * 0.002) * 80;
+        ghost.element.style.transform = `translate(${ghost.x}px, ${ghost.y}px)`;
         
-        ghost.element.style.transform = `translate(${ghost.lastX}px, ${ghost.lastY}px)`;
-      }
-      
-      // Trails
-      ghost.trailCounter++;
-      if (ghost.trailCounter >= 3) {
-        ghost.trailCounter = 0;
-        spawnGhostTrail(ghost.lastX, ghost.lastY);
-      }
-      
-      // Blue Flares
-      ghost.flareCounter++;
-      if (ghost.flareCounter >= 5) {
-        ghost.flareCounter = 0;
-        spawnGhostFlare(ghost.lastX + 20, ghost.lastY + 20);
-      }
-      
-      // Distance sound
-      const dx = (gameState.gameWidth * 0.2) - ghost.lastX;
-      const dy = gameState.noteY - ghost.lastY;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      if (dist < 80) playGhostWhoosh();
-
-      if (now - ghost.spawnTime > 18000) {
-        finishBoss2();
+        // Trail effect
+        ghost.trailCounter++;
+        if (ghost.trailCounter >= 4) {
+          ghost.trailCounter = 0;
+          spawnGhostTrail(ghost.x, ghost.y);
+        }
+        
+        // Remove offscreen
+        if (ghost.speed > 0 && ghost.x > gameState.gameWidth + 100) {
+          ghost.element.remove();
+          gameState.bossGhosts.splice(i, 1);
+        } else if (ghost.speed < 0 && ghost.x < -100) {
+          ghost.element.remove();
+          gameState.bossGhosts.splice(i, 1);
+        }
       }
     }
   }
@@ -1301,16 +1255,14 @@
 
   function finishBoss2() {
     gameState.boss2Active = false;
-    if (gameState.bossGhost) {
-      gameState.bossGhost.element.style.transition = 'opacity 1s';
-      gameState.bossGhost.element.style.opacity = '0';
-      const el = gameState.bossGhost.element;
-      setTimeout(() => el.remove(), 1000);
-      gameState.bossGhost = null;
-    }
-    stopGhostAudio();
+    gameState.bossGhosts.forEach(g => {
+       g.element.style.transition = 'opacity 1s';
+       g.element.style.opacity = '0';
+       setTimeout(() => g.element.remove(), 1000);
+    });
+    gameState.bossGhosts = [];
     playVictoryChime();
-    showFlashText("GHOST BANISHED!", "#9B00FF");
+    showFlashText("HORDE DEFEATED!", "#9B00FF");
     resetBossUI();
   }
 
@@ -1427,12 +1379,12 @@
     
     if (gameState.weather === 'rain' || gameState.weather === 'thunder') {
       elements.rainLayer.classList.add('active');
-      for(let i=0; i<30; i++) spawnWeatherElement('rain');
+      for(let i=0; i<80; i++) spawnWeatherElement('rain');
       fadeWeatherAudio('in', weatherSounds.rain);
       fadeWeatherAudio('out', weatherSounds.snow);
     } else if (gameState.weather === 'snow') {
       elements.snowLayer.classList.add('active');
-      for(let i=0; i<40; i++) spawnWeatherElement('snow');
+      for(let i=0; i<100; i++) spawnWeatherElement('snow');
       fadeWeatherAudio('in', weatherSounds.snow);
       fadeWeatherAudio('out', weatherSounds.rain);
     } else {
@@ -1482,11 +1434,16 @@
     el.className = type === 'rain' ? 'neela-rain-drop' : 'neela-snow-flake';
     
     const x = Math.random() * gameState.gameWidth;
-    const y = Math.random() * gameState.gameHeight - gameState.gameHeight;
-    const speed = type === 'rain' ? 10 + Math.random() * 10 : 2 + Math.random() * 3;
+    const y = Math.random() * gameState.gameHeight - (gameState.gameHeight * 1.5); // Wider vertical range
+    const speed = type === 'rain' ? 14 + Math.random() * 8 : 2 + Math.random() * 3;
     
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
+    
+    // Wind-swept rain realism
+    if (type === 'rain') {
+      el.style.transform = 'rotate(-15deg)';
+    }
     
     const targetLayer = type === 'rain' ? elements.rainLayer : elements.snowLayer;
     targetLayer.appendChild(el);
@@ -1607,19 +1564,30 @@
       }
     }
 
-    // Boss 2 Collision
-    if (gameState.bossGhost && gameState.ghostBuffer.length >= 120) {
-      const ghostX = gameState.bossGhost.lastX;
-      const ghostY = gameState.bossGhost.lastY;
-      const noteX = gameState.gameWidth * 0.2;
-      
-      const shrink = 10; // More forgiving ghost hitbox
-      const r1 = { left: noteX + shrink, right: noteX + 40 - shrink, top: gameState.noteY + shrink, bottom: gameState.noteY + 40 - shrink };
-      const r2 = { left: ghostX + shrink, right: ghostX + 40 - shrink, top: ghostY + shrink, bottom: ghostY + 40 - shrink };
-      
-      if (!(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom)) {
-        triggerGameOver();
-        return;
+    // Boss 2 Swarm Collision
+    if (gameState.boss2Active) {
+      const noteRect = elements.noteInner.getBoundingClientRect();
+      const shrink = 10;
+      const r1 = { 
+        left: noteRect.left + shrink, 
+        right: noteRect.right - shrink, 
+        top: noteRect.top + shrink, 
+        bottom: noteRect.bottom - shrink 
+      };
+
+      for (let ghost of gameState.bossGhosts) {
+        const ghostRect = ghost.element.getBoundingClientRect();
+        const r2 = { 
+          left: ghostRect.left + shrink, 
+          right: ghostRect.right - shrink, 
+          top: ghostRect.top + shrink, 
+          bottom: ghostRect.bottom - shrink 
+        };
+
+        if (!(r1.right < r2.left || r1.left > r2.right || r1.bottom < r2.top || r1.top > r2.bottom)) {
+          triggerGameOver();
+          return;
+        }
       }
     }
   }
