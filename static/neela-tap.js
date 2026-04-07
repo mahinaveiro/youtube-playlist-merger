@@ -156,16 +156,27 @@
       top: -10px;
       opacity: 0.8;
     }
-    .neela-thunder-flash {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: white;
-      opacity: 0;
       z-index: 60;
       pointer-events: none;
+    }
+    .neela-mute-hint {
+      position: absolute;
+      top: 60px;
+      right: 15px;
+      background: rgba(167, 139, 250, 0.9);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      z-index: 100;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.6s, transform 0.6s;
+    }
+    .neela-mute-hint.active {
+      opacity: 1;
+      transform: translateY(0);
     }
   `;
   document.head.appendChild(style);
@@ -176,6 +187,18 @@
   let bgMusicGain = null;
   let isMusicMuted = false;
   const MUSIC_MUTE_KEY = 'neela_tap_music_muted';
+  
+  // Weather sound files
+  const weatherSounds = {
+    rain: new Audio('/static/sounds/rain.mp3'),
+    snow: new Audio('/static/sounds/snow.mp3'),
+    lightning: new Audio('/static/sounds/lightning.mp3')
+  };
+  weatherSounds.rain.loop = true;
+  weatherSounds.snow.loop = true;
+  weatherSounds.rain.volume = 0;
+  weatherSounds.snow.volume = 0;
+  weatherSounds.lightning.volume = 0.5;
   
   function initAudio() {
     if (!audioCtx) {
@@ -648,6 +671,25 @@
     elements.note.style.transform = `translate(${initialX}px, ${gameState.noteY}px) rotate(0deg)`;
     
     actuallyStartGame();
+    showMuteHint();
+  }
+  
+  function showMuteHint() {
+    if (localStorage.getItem('neela_tap_mute_hint_shown')) return;
+    
+    // Create hint toast
+    const hint = document.createElement('div');
+    hint.className = 'neela-mute-hint';
+    hint.innerHTML = 'Tip: You can mute the music here!';
+    elements.canvas.appendChild(hint);
+    
+    // Show then hide
+    setTimeout(() => hint.classList.add('active'), 1500);
+    setTimeout(() => {
+      hint.classList.remove('active');
+      setTimeout(() => hint.remove(), 600);
+      localStorage.setItem('neela_tap_mute_hint_shown', 'true');
+    }, 6500);
   }
   
   function actuallyStartGame() {
@@ -687,6 +729,7 @@
     gameState.lastWeatherScore = 0;
     gameState.nextWeatherAt = 7 + Math.floor(Math.random() * 5);
     clearWeatherElements();
+    stopWeatherSounds();
     elements.rainLayer.classList.remove('active');
     elements.snowLayer.classList.remove('active');
     
@@ -717,6 +760,7 @@
     detachGameInputs();
     clearPipes();
     clearParticles();
+    stopWeatherSounds();
     
     // Boss cleanup
     if (gameState.bossWall) {
@@ -1356,23 +1400,73 @@
     const currentIndex = cycle.indexOf(gameState.weather);
     const nextIndex = (currentIndex + 1) % cycle.length;
     
+    const prevWeather = gameState.weather;
     gameState.weather = cycle[nextIndex];
     gameState.lastWeatherScore = gameState.score;
     gameState.nextWeatherAt = 7 + Math.floor(Math.random() * 5); // 7 to 11 points
     
-    // Update visual layers
+    // Visual layers
     elements.rainLayer.classList.remove('active');
     elements.snowLayer.classList.remove('active');
+    
+    // Stop previous sounds
+    if (prevWeather === 'rain' || prevWeather === 'thunder' || prevWeather === 'snow') {
+       if (gameState.weather !== 'rain' && gameState.weather !== 'thunder' && gameState.weather !== 'snow') {
+         // Fading handled in individual triggers or specialized function if wanted, 
+         // but simple stop/start for these loops
+       }
+    }
     
     if (gameState.weather === 'rain' || gameState.weather === 'thunder') {
       elements.rainLayer.classList.add('active');
       for(let i=0; i<30; i++) spawnWeatherElement('rain');
+      fadeWeatherAudio('in', weatherSounds.rain);
+      fadeWeatherAudio('out', weatherSounds.snow);
     } else if (gameState.weather === 'snow') {
       elements.snowLayer.classList.add('active');
       for(let i=0; i<40; i++) spawnWeatherElement('snow');
+      fadeWeatherAudio('in', weatherSounds.snow);
+      fadeWeatherAudio('out', weatherSounds.rain);
     } else {
       clearWeatherElements();
+      fadeWeatherAudio('out', weatherSounds.rain);
+      fadeWeatherAudio('out', weatherSounds.snow);
     }
+  }
+
+  function fadeWeatherAudio(direction, audio) {
+    if (direction === 'in') {
+      if (audio.paused) audio.play().catch(e => {});
+      let vol = 0;
+      audio.volume = 0;
+      const interval = setInterval(() => {
+        vol += 0.02;
+        if (vol >= 0.45) {
+          vol = 0.45;
+          clearInterval(interval);
+        }
+        audio.volume = vol;
+      }, 30);
+    } else {
+      let vol = audio.volume;
+      const interval = setInterval(() => {
+        vol -= 0.02;
+        if (vol <= 0) {
+          vol = 0;
+          clearInterval(interval);
+          audio.pause();
+          audio.currentTime = 0;
+        }
+        audio.volume = vol;
+      }, 30);
+    }
+  }
+
+  function stopWeatherSounds() {
+     weatherSounds.rain.pause();
+     weatherSounds.rain.currentTime = 0;
+     weatherSounds.snow.pause();
+     weatherSounds.snow.currentTime = 0;
   }
 
   function spawnWeatherElement(type) {
@@ -1430,34 +1524,15 @@
 
   function triggerThunder() {
     elements.thunderFlash.style.opacity = '0.8';
-    // Deep rumble
-    playOscillator(60, 'sawtooth', 0.8, 0.4, 30, 0.8);
-    // Sharp crack
-    playThunderCrack();
+    // Play external audio file instead of oscillator
+    weatherSounds.lightning.currentTime = 0;
+    weatherSounds.lightning.play().catch(e => {});
     
     setTimeout(() => elements.thunderFlash.style.opacity = '0', 50);
     setTimeout(() => {
       elements.thunderFlash.style.opacity = '0.4';
       setTimeout(() => elements.thunderFlash.style.opacity = '0', 30);
     }, 100);
-  }
-
-  function playThunderCrack() {
-    if (!audioCtx) return;
-    try {
-      const bufferSize = audioCtx.sampleRate * 0.1;
-      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for(let i=0; i<bufferSize; i++) data[i] = Math.random() * 2 - 1;
-      const noise = audioCtx.createBufferSource();
-      noise.buffer = buffer;
-      const gain = audioCtx.createGain();
-      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-      noise.connect(gain);
-      gain.connect(audioCtx.destination);
-      noise.start();
-    } catch(e) {}
   }
 
   function updateParticles() {
