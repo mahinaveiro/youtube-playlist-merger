@@ -685,7 +685,7 @@
     
     // Splash effect disabled for performance on mobile
     }
-  }
+  
 
   function startGame() {
     initAudio();
