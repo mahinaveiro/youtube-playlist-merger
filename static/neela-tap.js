@@ -683,9 +683,7 @@
     gameState.noteVelocity = FLAP_STRENGTH;
     playFlapSound();
     
-    // Splash effect if raining
-    if (gameState.weather === 'rain' || gameState.weather === 'thunder') {
-      spawnSplash(gameState.gameWidth * 0.2 + NOTE_SIZE/2, gameState.noteY + NOTE_SIZE/2);
+    // Splash effect disabled for performance on mobile
     }
   }
 
