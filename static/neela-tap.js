@@ -394,7 +394,7 @@
   
   const START_PIPE_SPEED = 2.4;   // Boosted starting speed
   const MAX_PIPE_SPEED = 5.0;     // Slightly higher max
-  const SPEED_INC = 0.08;
+  const SPEED_INC = 0.04;
   
   const START_SPAWN_INTERVAL = isMobile ? 2200 : 2600; // Desktop gets more distance
   const MIN_SPAWN_INTERVAL = 1500;   // Minimum gap
@@ -1043,7 +1043,7 @@
         checkWeatherTriggers();
         
         if (!gameState.boss1Active && !gameState.boss2Active) {
-          gameState.pipeSpeed = Math.min(START_PIPE_SPEED + (gameState.score * SPEED_INC), MAX_PIPE_SPEED);
+          gameState.pipeSpeed = Math.min(START_PIPE_SPEED + (gameState.score * SPEED_INC * 0.5), MAX_PIPE_SPEED);
           const intervalReduc = Math.floor(gameState.score / 5) * 15;
           gameState.spawnInterval = Math.max(START_SPAWN_INTERVAL - intervalReduc, MIN_SPAWN_INTERVAL);
         }

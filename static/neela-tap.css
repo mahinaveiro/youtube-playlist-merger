@@ -378,6 +378,36 @@
   gap: 8px;
 }
 
+/* Boss Incoming Notification */
+.neela-boss-banner {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  transform: translate(-50%, -20%);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 14px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 30;
+}
+.neela-boss-banner.active {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.neela-boss-banner h2 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+.neela-boss-banner p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
 .neela-banner-icon {
   width: 24px;
   height: 24px;
