@@ -743,8 +743,8 @@
     gameState.pipeSpeed = START_PIPE_SPEED;
     gameState.spawnInterval = START_SPAWN_INTERVAL;
     
-    // Position first pipe VERY close (45% across screen) for truly instant action
-    spawnPipe(gameState.gameWidth * 0.45);
+    // Position first pipe further away (90% across screen) to give users breathing room
+    spawnPipe(gameState.gameWidth * 0.9);
     gameState.lastPipeTimestamp = performance.now();
     
     // Reset Boss State
