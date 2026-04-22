@@ -1,6 +1,6 @@
 {
-  "name": "Playlist Downloader & Merger",
-  "short_name": "Playlist Downloader",
+  "name": "YouTube Playlist Toolkit",
+  "short_name": "YT Toolkit",
   "description": "Merge YouTube Playlists into One MP3 without hassle.",
   "start_url": "/",
   "scope": "/",

@@ -50,7 +50,7 @@
     <meta name="theme-color" content="#09090b" /> <!-- zinc-950 -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Playlist Downloader" />
+    <meta name="apple-mobile-web-app-title" content="YouTube Playlist Toolkit" />
     
     <!-- iOS Icons -->
     <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png" />
@@ -174,7 +174,7 @@
         >
           Merge into One MP3
         </button>
-        <p id="form-hint" class="mt-3 text-center text-xs font-light text-zinc-500">No API keys. Processing runs on this server.</p>
+        <p id="form-hint" class="mt-3 text-center text-xs font-light text-zinc-500">˖ ݁♬⋆.˚𝄞 Curated for someone special ⋆.˚✮🎧✮˚.⋆</p>
       </section>
 
       
@@ -238,7 +238,7 @@
         >
           Download MP3
         </button>
-        <p class="mt-3 text-center text-xs font-light text-zinc-500">No API keys. Processing runs on this server.</p>
+        <p class="mt-3 text-center text-xs font-light text-zinc-500">˖ ݁♬⋆.˚𝄞 Curated for someone special ⋆.˚✮🎧✮˚.⋆</p>
       </section>
 
       <!-- Video Loading -->
@@ -844,6 +844,7 @@
           const headerDesc = $("header-desc");
           
           if (tab === "playlist") {
+            document.title = "Ultimate Playlist Merger - Merge YouTube Playlists into One MP3";
             tabPlaylist.className = "rounded-full px-6 py-2 text-sm font-medium text-emerald-400 bg-zinc-800/80 shadow-sm transition-all";
             tabVideo.className = "rounded-full px-6 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-all";
             
@@ -857,6 +858,7 @@
               vidPanelForm.classList.add("hidden");
             }
           } else {
+            document.title = "YT to MP3 - Download YouTube Videos as MP3";
             tabVideo.className = "rounded-full px-6 py-2 text-sm font-medium text-emerald-400 bg-zinc-800/80 shadow-sm transition-all";
             tabPlaylist.className = "rounded-full px-6 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-all";
             
