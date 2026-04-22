@@ -41,6 +41,10 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/static/favicon.png" />
     
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Dosis:wght@200..800&display=swap');
+    </style>
+    
     <!-- PWA Settings & Apple iOS support -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#09090b" /> <!-- zinc-950 -->
@@ -65,7 +69,7 @@
         theme: {
           extend: {
             fontFamily: {
-              sans: ["ui-sans-serif", "system-ui", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
+              sans: ["Dosis", "ui-sans-serif", "system-ui", "sans-serif"],
             },
           },
         },
@@ -82,9 +86,9 @@
 
     <main class="relative mx-auto flex min-h-screen max-w-lg flex-col px-4 py-10 sm:max-w-xl sm:px-6 sm:py-14">
       <header class="upm-animate-fade-in mb-10 text-center sm:mb-12">
-        <p id="header-eyebrow" class="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-emerald-400/90">YouTube → one file</p>
-        <h1 id="header-h1" class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Ultimate Playlist Merger</h1>
-        <p id="header-desc" class="mx-auto mt-3 max-w-md text-sm leading-relaxed text-zinc-400">
+        <p id="header-eyebrow" class="mb-2 text-xs font-light uppercase tracking-[0.2em] text-emerald-400/90">YouTube → one file</p>
+        <h1 id="header-h1" class="text-3xl font-bold tracking-tight text-white sm:text-4xl">Ultimate Playlist Merger</h1>
+        <p id="header-desc" class="mx-auto mt-3 max-w-md text-sm font-light leading-relaxed text-zinc-400">
           Paste any playlist or single video link. We grab every track in order, merge them, and hand you one
           <span class="text-emerald-400/90">ULTIMATE_PLAYLIST.mp3</span>.
         </p>
@@ -94,8 +98,8 @@
       <!-- Tabs -->
       <div class="mb-8 flex justify-center upm-animate-fade-in" style="animation-delay: 0.02s">
         <div class="flex rounded-full bg-zinc-900/60 p-1 border border-zinc-800/80 backdrop-blur-sm">
-          <button id="tab-playlist" class="rounded-full px-6 py-2 text-sm font-medium text-emerald-400 bg-zinc-800/80 shadow-sm transition-all">Playlist Merger</button>
-          <button id="tab-video" class="rounded-full px-6 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-all">YT to MP3</button>
+          <button id="tab-playlist" class="rounded-full px-6 py-2 text-sm font-semibold text-emerald-400 bg-zinc-800/80 shadow-sm transition-all">Playlist Merger</button>
+          <button id="tab-video" class="rounded-full px-6 py-2 text-sm font-semibold text-zinc-400 hover:text-zinc-200 transition-all">YT to MP3</button>
         </div>
       </div>
 
@@ -113,7 +117,7 @@
             inputmode="url"
             autocomplete="off"
             placeholder="https://www.youtube.com/playlist?list=…"
-            class="flex-1 min-h-[52px] w-full rounded-l-xl border border-zinc-700 border-r-0 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 outline-none ring-0 transition tracking-wide group-focus-within:border-emerald-500/50"
+            class="flex-1 min-h-[52px] w-full rounded-l-xl border border-zinc-700 border-r-0 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 placeholder:font-light outline-none ring-0 transition tracking-wide group-focus-within:border-emerald-500/50"
           />
           <div class="relative flex" id="quality-dropdown-container">
             <div class="w-[1px] bg-zinc-700/80 my-2 shadow"></div>
@@ -160,17 +164,17 @@
           autocomplete="off"
           placeholder="ULTIMATE_PLAYLIST"
           maxlength="100"
-          class="mb-6 w-full min-h-[52px] rounded-xl border border-zinc-700 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 outline-none ring-emerald-500/40 transition focus:border-emerald-500/50 focus:ring-2"
+          class="mb-6 w-full min-h-[52px] rounded-xl border border-zinc-700 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 placeholder:font-light outline-none ring-emerald-500/40 transition focus:border-emerald-500/50 focus:ring-2"
         />
         
         <button
           id="btn-merge"
           type="button"
-          class="flex w-full min-h-[52px] items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          class="flex w-full min-h-[52px] items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-bold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Merge into One MP3
         </button>
-        <p id="form-hint" class="mt-3 text-center text-xs text-zinc-500">No API keys. Processing runs on this server.</p>
+        <p id="form-hint" class="mt-3 text-center text-xs font-light text-zinc-500">No API keys. Processing runs on this server.</p>
       </section>
 
       
@@ -187,7 +191,7 @@
             inputmode="url"
             autocomplete="off"
             placeholder="https://www.youtube.com/watch?v=…"
-            class="flex-1 min-h-[52px] w-full rounded-l-xl border border-zinc-700 border-r-0 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 outline-none ring-0 transition tracking-wide group-focus-within:border-emerald-500/50"
+            class="flex-1 min-h-[52px] w-full rounded-l-xl border border-zinc-700 border-r-0 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 placeholder:font-light outline-none ring-0 transition tracking-wide group-focus-within:border-emerald-500/50"
           />
           <div class="relative flex" id="vid-quality-dropdown-container">
             <div class="w-[1px] bg-zinc-700/80 my-2 shadow"></div>
@@ -230,11 +234,11 @@
         <button
           id="vid-btn-merge"
           type="button"
-          class="flex w-full min-h-[52px] items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          class="flex w-full min-h-[52px] items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-bold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Download MP3
         </button>
-        <p class="mt-3 text-center text-xs text-zinc-500">No API keys. Processing runs on this server.</p>
+        <p class="mt-3 text-center text-xs font-light text-zinc-500">No API keys. Processing runs on this server.</p>
       </section>
 
       <!-- Video Loading -->
@@ -248,7 +252,7 @@
             <span class="upm-dot inline-block h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
           </div>
           <p id="vid-loading-title" class="text-lg font-semibold text-white sm:text-xl">Working on it…</p>
-          <p id="vid-loading-sub" class="mt-2 text-sm text-zinc-400"></p>
+          <p id="vid-loading-sub" class="mt-2 text-sm font-light text-zinc-400"></p>
         </div>
       </section>
 
@@ -262,19 +266,19 @@
               <path pathLength="1" d="M6 12.5l4 4 8-9" class="upm-check-circle" />
             </svg>
           </div>
-          <p class="text-lg font-semibold text-white sm:text-xl">Your MP3 is ready!</p>
-          <p class="mt-2 text-sm text-zinc-400">Tap below to save <span id="vid-success-filename" class="text-emerald-400/90">video.mp3</span></p>
+          <p class="text-lg font-bold text-white sm:text-xl">Your MP3 is ready!</p>
+          <p class="mt-2 text-sm font-light text-zinc-400">Tap below to save <span id="vid-success-filename" class="text-emerald-400/90">video.mp3</span></p>
           
           <div class="mt-4 rounded-lg border border-yellow-500/30 bg-yellow-950/20 p-3">
-            <p class="text-xs font-medium text-yellow-200">⚠️ Files will be auto-deleted in 1 hour</p>
-            <p class="mt-1 text-xs text-yellow-300/80">Download now to keep your file!</p>
+            <p class="text-xs font-light text-yellow-200">⚠️ Files will be auto-deleted in 1 hour</p>
+            <p class="mt-1 text-xs font-light text-yellow-300/80">Download now to keep your file!</p>
           </div>
           
           <a
             id="vid-btn-download"
             href="#"
             download="video.mp3"
-            class="mt-6 flex min-h-[56px] w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 active:scale-[0.98]"
+            class="mt-6 flex min-h-[56px] w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-bold text-zinc-950 shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 active:scale-[0.98]"
           >
             Download MP3
           </a>
@@ -298,8 +302,8 @@
       <!-- Video Error -->
       <section id="vid-panel-error" class="mt-8 hidden">
         <div class="rounded-2xl border border-red-500/30 bg-red-950/30 p-5 text-center sm:p-6">
-          <p class="text-sm font-semibold text-red-200">Something went wrong</p>
-          <p id="vid-error-text" class="mt-2 whitespace-pre-wrap break-words text-left text-sm leading-relaxed text-red-100/90"></p>
+          <p class="text-sm font-normal text-red-200">Something went wrong</p>
+          <p id="vid-error-text" class="mt-2 whitespace-pre-wrap break-words text-left text-sm font-normal leading-relaxed text-red-100/90"></p>
           <button
             id="vid-btn-retry"
             type="button"
@@ -321,7 +325,7 @@
             <span class="upm-dot inline-block h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
           </div>
           <p id="loading-title" class="text-lg font-semibold text-white sm:text-xl">Working on it…</p>
-          <p id="loading-sub" class="mt-2 text-sm text-zinc-400"></p>
+          <p id="loading-sub" class="mt-2 text-sm font-light text-zinc-400"></p>
         </div>
       </section>
 
@@ -335,19 +339,19 @@
               <path pathLength="1" d="M6 12.5l4 4 8-9" class="upm-check-circle" />
             </svg>
           </div>
-          <p class="text-lg font-semibold text-white sm:text-xl">Your ultimate merged MP3 is ready!</p>
-          <p class="mt-2 text-sm text-zinc-400">Tap below to save <span id="success-filename" class="text-emerald-400/90">ULTIMATE_PLAYLIST.mp3</span></p>
+          <p class="text-lg font-bold text-white sm:text-xl">Your ultimate merged MP3 is ready!</p>
+          <p class="mt-2 text-sm font-light text-zinc-400">Tap below to save <span id="success-filename" class="text-emerald-400/90">ULTIMATE_PLAYLIST.mp3</span></p>
           
           <div class="mt-4 rounded-lg border border-yellow-500/30 bg-yellow-950/20 p-3">
-            <p class="text-xs font-medium text-yellow-200">⚠️ Files will be auto-deleted in 1 hour</p>
-            <p class="mt-1 text-xs text-yellow-300/80">Download now to keep your merged playlist!</p>
+            <p class="text-xs font-light text-yellow-200">⚠️ Files will be auto-deleted in 1 hour</p>
+            <p class="mt-1 text-xs font-light text-yellow-300/80">Download now to keep your merged playlist!</p>
           </div>
           
           <a
             id="btn-download"
             href="#"
             download="ULTIMATE_PLAYLIST.mp3"
-            class="mt-6 flex min-h-[56px] w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 active:scale-[0.98]"
+            class="mt-6 flex min-h-[56px] w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-bold text-zinc-950 shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 active:scale-[0.98]"
           >
             Download merged MP3
           </a>
@@ -371,8 +375,8 @@
       <!-- Error -->
       <section id="panel-error-playlist" class="mt-8 hidden">
         <div class="rounded-2xl border border-red-500/30 bg-red-950/30 p-5 text-center sm:p-6">
-          <p class="text-sm font-semibold text-red-200">Something went wrong</p>
-          <p id="error-text" class="mt-2 whitespace-pre-wrap break-words text-left text-sm leading-relaxed text-red-100/90"></p>
+          <p class="text-sm font-normal text-red-200">Something went wrong</p>
+          <p id="error-text" class="mt-2 whitespace-pre-wrap break-words text-left text-sm font-normal leading-relaxed text-red-100/90"></p>
           <button
             id="btn-retry"
             type="button"
@@ -384,7 +388,7 @@
       </section>
 
       <footer class="mt-auto pt-12 text-center relative z-10 pb-6">
-        <p class="mt-3 text-xs text-zinc-500">Created by <span id="footer-mahin" class="text-emerald-400/90 font-medium cursor-pointer">Mahin</span></p>
+        <p class="mt-3 text-xs font-light text-zinc-500">Created by <span id="footer-mahin" class="text-emerald-400/90 font-semibold cursor-pointer">Mahin</span></p>
         <button id="pwa-install-btn" class="hidden mt-6 text-xs font-medium text-emerald-400/80 hover:text-emerald-400 transition cursor-pointer mx-auto px-4 py-2 rounded-full border border-emerald-900/40 bg-emerald-950/20 active:scale-95">
           Install App
         </button>
