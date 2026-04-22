@@ -1,0 +1,6 @@
+{
+  "projectId": "276eead3-fd55-4fc0-a6b8-f9444b90837f",
+  "createdAt": 1776846582883,
+  "startupCommands": [".\\.venv\\Scripts\\Activate.ps1 ; pip install -r requirements.txt ; uvicorn main:app --reload"],
+  "templateId": "any"
+}

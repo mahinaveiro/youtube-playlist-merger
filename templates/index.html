@@ -82,17 +82,26 @@
 
     <main class="relative mx-auto flex min-h-screen max-w-lg flex-col px-4 py-10 sm:max-w-xl sm:px-6 sm:py-14">
       <header class="upm-animate-fade-in mb-10 text-center sm:mb-12">
-        <p class="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-emerald-400/90">YouTube → one file</p>
-        <h1 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Ultimate Playlist Merger</h1>
-        <p class="mx-auto mt-3 max-w-md text-sm leading-relaxed text-zinc-400">
+        <p id="header-eyebrow" class="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-emerald-400/90">YouTube → one file</p>
+        <h1 id="header-h1" class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Ultimate Playlist Merger</h1>
+        <p id="header-desc" class="mx-auto mt-3 max-w-md text-sm leading-relaxed text-zinc-400">
           Paste any playlist or single video link. We grab every track in order, merge them, and hand you one
           <span class="text-emerald-400/90">ULTIMATE_PLAYLIST.mp3</span>.
         </p>
       </header>
 
-      <!-- Form card -->
+      
+      <!-- Tabs -->
+      <div class="mb-8 flex justify-center upm-animate-fade-in" style="animation-delay: 0.02s">
+        <div class="flex rounded-full bg-zinc-900/60 p-1 border border-zinc-800/80 backdrop-blur-sm">
+          <button id="tab-playlist" class="rounded-full px-6 py-2 text-sm font-medium text-emerald-400 bg-zinc-800/80 shadow-sm transition-all">Playlist Merger</button>
+          <button id="tab-video" class="rounded-full px-6 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-all">YT to MP3</button>
+        </div>
+      </div>
+
+      <!-- Form card (Playlist) -->
       <section
-        id="panel-form"
+        id="panel-form-playlist"
         class="upm-animate-fade-in upm-animate-scale-in rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-5 shadow-xl shadow-black/40 backdrop-blur-sm sm:p-7"
         style="animation-delay: 0.05s"
       >
@@ -164,8 +173,145 @@
         <p id="form-hint" class="mt-3 text-center text-xs text-zinc-500">No API keys. Processing runs on this server.</p>
       </section>
 
-      <!-- Loading -->
-      <section id="panel-loading" class="mt-8 hidden">
+      
+      <!-- Form card (Video) -->
+      <section
+        id="vid-panel-form"
+        class="upm-animate-fade-in upm-animate-scale-in rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-5 shadow-xl shadow-black/40 backdrop-blur-sm sm:p-7 hidden"
+      >
+        <label for="vid-url-input" class="mb-2 block text-sm font-medium text-zinc-300">YouTube video URL</label>
+        <div class="relative flex mb-6 shadow-sm group">
+          <input
+            id="vid-url-input"
+            type="url"
+            inputmode="url"
+            autocomplete="off"
+            placeholder="https://www.youtube.com/watch?v=…"
+            class="flex-1 min-h-[52px] w-full rounded-l-xl border border-zinc-700 border-r-0 bg-zinc-950/80 px-4 py-3.5 text-base text-white placeholder:text-zinc-600 outline-none ring-0 transition tracking-wide group-focus-within:border-emerald-500/50"
+          />
+          <div class="relative flex" id="vid-quality-dropdown-container">
+            <div class="w-[1px] bg-zinc-700/80 my-2 shadow"></div>
+            
+            <button
+              id="vid-quality-dropdown-btn"
+              type="button"
+              class="flex h-full min-w-[110px] items-center justify-between rounded-r-xl border border-zinc-700 border-l-0 bg-zinc-900/50 px-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800 focus:outline-none focus:bg-zinc-800 group-focus-within:border-emerald-500/50"
+            >
+              <span id="vid-quality-selected-text">Quality</span>
+              <svg id="vid-quality-chevron" class="ml-1 h-4 w-4 text-zinc-500 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            <div
+              id="vid-quality-dropdown-menu"
+              class="absolute right-0 mt-2 hidden w-36 overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl z-50 transform origin-top transition-all"
+            >
+              <ul class="py-1 text-sm text-zinc-300" id="vid-quality-options">
+                <li>
+                  <button type="button" class="flex w-full items-center justify-between px-4 py-2.5 hover:bg-zinc-800 transition text-emerald-400 font-medium" data-value="320" data-label="Quality">
+                    <span>Quality</span>
+                    <span class="text-xs text-emerald-500/80 ml-2">320</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="flex w-full items-center justify-between px-4 py-2.5 hover:bg-zinc-800 transition" data-value="128" data-label="Light">
+                    <span>Light</span>
+                    <span class="text-xs text-zinc-500 ml-2">128</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <!-- Focus ring wrapper -->
+          <div class="pointer-events-none absolute inset-0 rounded-xl ring-0 ring-emerald-500/40 transition group-focus-within:ring-2"></div>
+        </div>
+        
+        <button
+          id="vid-btn-merge"
+          type="button"
+          class="flex w-full min-h-[52px] items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Download MP3
+        </button>
+        <p class="mt-3 text-center text-xs text-zinc-500">No API keys. Processing runs on this server.</p>
+      </section>
+
+      <!-- Video Loading -->
+      <section id="vid-panel-loading" class="mt-8 hidden">
+        <div
+          class="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-6 text-center shadow-xl shadow-black/30 backdrop-blur-sm sm:p-8"
+        >
+          <div class="mb-5 flex justify-center gap-1.5">
+            <span class="upm-dot inline-block h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+            <span class="upm-dot inline-block h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+            <span class="upm-dot inline-block h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+          </div>
+          <p id="vid-loading-title" class="text-lg font-semibold text-white sm:text-xl">Working on it…</p>
+          <p id="vid-loading-sub" class="mt-2 text-sm text-zinc-400"></p>
+        </div>
+      </section>
+
+      <!-- Video Success -->
+      <section id="vid-panel-success" class="mt-8 hidden">
+        <div
+          class="rounded-2xl border border-emerald-500/25 bg-zinc-900/60 p-6 text-center shadow-xl shadow-emerald-900/20 backdrop-blur-sm sm:p-8"
+        >
+          <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/30">
+            <svg class="h-9 w-9 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path pathLength="1" d="M6 12.5l4 4 8-9" class="upm-check-circle" />
+            </svg>
+          </div>
+          <p class="text-lg font-semibold text-white sm:text-xl">Your MP3 is ready!</p>
+          <p class="mt-2 text-sm text-zinc-400">Tap below to save <span id="vid-success-filename" class="text-emerald-400/90">video.mp3</span></p>
+          
+          <div class="mt-4 rounded-lg border border-yellow-500/30 bg-yellow-950/20 p-3">
+            <p class="text-xs font-medium text-yellow-200">⚠️ Files will be auto-deleted in 1 hour</p>
+            <p class="mt-1 text-xs text-yellow-300/80">Download now to keep your file!</p>
+          </div>
+          
+          <a
+            id="vid-btn-download"
+            href="#"
+            download="video.mp3"
+            class="mt-6 flex min-h-[56px] w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-semibold text-zinc-950 shadow-lg shadow-emerald-500/25 transition hover:bg-emerald-400 active:scale-[0.98]"
+          >
+            Download MP3
+          </a>
+          <button
+            id="vid-btn-cleanup"
+            type="button"
+            class="mt-3 w-full min-h-[48px] rounded-xl border border-zinc-700 bg-transparent px-4 text-sm font-medium text-zinc-300 transition hover:border-zinc-500 hover:bg-zinc-800/50 active:scale-[0.99]"
+          >
+            Remove file from server
+          </button>
+          <button
+            id="vid-btn-new"
+            type="button"
+            class="mt-2 w-full min-h-[48px] text-sm font-medium text-emerald-400/90 underline-offset-4 hover:underline"
+          >
+            Download another MP3
+          </button>
+        </div>
+      </section>
+
+      <!-- Video Error -->
+      <section id="vid-panel-error" class="mt-8 hidden">
+        <div class="rounded-2xl border border-red-500/30 bg-red-950/30 p-5 text-center sm:p-6">
+          <p class="text-sm font-semibold text-red-200">Something went wrong</p>
+          <p id="vid-error-text" class="mt-2 whitespace-pre-wrap break-words text-left text-sm leading-relaxed text-red-100/90"></p>
+          <button
+            id="vid-btn-retry"
+            type="button"
+            class="mt-5 w-full min-h-[48px] rounded-xl border border-zinc-600 bg-zinc-900 px-4 text-sm font-medium text-white transition hover:bg-zinc-800"
+          >
+            Try again
+          </button>
+        </div>
+      </section>
+
+      <!-- Loading (Playlist) -->
+      <section id="panel-loading-playlist" class="mt-8 hidden">
         <div
           class="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-6 text-center shadow-xl shadow-black/30 backdrop-blur-sm sm:p-8"
         >
@@ -180,7 +326,7 @@
       </section>
 
       <!-- Success -->
-      <section id="panel-success" class="mt-8 hidden">
+      <section id="panel-success-playlist" class="mt-8 hidden">
         <div
           class="rounded-2xl border border-emerald-500/25 bg-zinc-900/60 p-6 text-center shadow-xl shadow-emerald-900/20 backdrop-blur-sm sm:p-8"
         >
@@ -223,7 +369,7 @@
       </section>
 
       <!-- Error -->
-      <section id="panel-error" class="mt-8 hidden">
+      <section id="panel-error-playlist" class="mt-8 hidden">
         <div class="rounded-2xl border border-red-500/30 bg-red-950/30 p-5 text-center sm:p-6">
           <p class="text-sm font-semibold text-red-200">Something went wrong</p>
           <p id="error-text" class="mt-2 whitespace-pre-wrap break-words text-left text-sm leading-relaxed text-red-100/90"></p>
@@ -308,11 +454,13 @@
         }
 
         const $ = (id) => document.getElementById(id);
-        const panelForm = $("panel-form");
-        const panelLoading = $("panel-loading");
-        const panelSuccess = $("panel-success");
-        const panelError = $("panel-error");
-        const urlInput = $("url-input");
+        
+        const panelFormPlaylist = $("panel-form-playlist");
+        const panelLoadingPlaylist = $("panel-loading-playlist");
+        const panelSuccessPlaylist = $("panel-success-playlist");
+        const panelErrorPlaylist = $("panel-error-playlist");
+
+                                const urlInput = $("url-input");
         const filenameInput = $("filename-input");
         const btnMerge = $("btn-merge");
         const btnDownload = $("btn-download");
@@ -405,23 +553,45 @@
             window.NeelaTap.init();
             
             // Set callbacks
+            
             window.NeelaTap.setOnQuit(() => {
               isPlayingGame = false;
               window.NeelaTap.hideGame();
-              if (processingComplete) {
-                showSuccess();
-              } else if (jobId) {
-                showLoading();
+              if (activeTab === "playlist") {
+                  if (processingComplete) showSuccess();
+                  else if (jobId) showLoading();
+                  else showForm();
               } else {
-                showForm();
+                  // For video tab
+                  const vs = document.getElementById('vid-panel-success');
+                  const vl = document.getElementById('vid-panel-loading');
+                  const vf = document.getElementById('vid-panel-form');
+                  
+                  if (!vs.classList.contains('hidden')) {
+                      // Already showing success
+                  } else if (window.vidJobId) {
+                      vl.classList.remove('hidden');
+                  } else {
+                      vf.classList.remove('hidden');
+                  }
               }
             });
             
             window.NeelaTap.setOnMixReady(() => {
               isPlayingGame = false;
               window.NeelaTap.hideGame();
-              showSuccess();
+              if (activeTab === "playlist") {
+                  showSuccess();
+              } else {
+                  const vs = document.getElementById('vid-panel-success');
+                  const vl = document.getElementById('vid-panel-loading');
+                  const vf = document.getElementById('vid-panel-form');
+                  vl.classList.add('hidden');
+                  vf.classList.add('hidden');
+                  vs.classList.remove('hidden');
+              }
             });
+
           }
         });
 
@@ -435,7 +605,15 @@
         neelaNah.addEventListener('click', () => {
           neelaPrompt.classList.remove('active');
           showWittyMessage();
-          showLoading();
+          if (activeTab === "playlist") {
+            showLoading();
+          } else {
+            document.getElementById("vid-panel-form").classList.add("hidden");
+            document.getElementById("vid-panel-loading").classList.remove("hidden");
+            document.getElementById("vid-panel-success").classList.add("hidden");
+            document.getElementById("vid-panel-error").classList.add("hidden");
+            document.getElementById("panel-form-playlist").classList.add("hidden");
+          }
         });
 
         function showWittyMessage() {
@@ -451,31 +629,31 @@
         }
 
         function showForm() {
-          panelForm.classList.remove("hidden");
-          panelLoading.classList.add("hidden");
-          panelSuccess.classList.add("hidden");
-          panelError.classList.add("hidden");
+          panelFormPlaylist.classList.remove("hidden");
+          panelLoadingPlaylist.classList.add("hidden");
+          panelSuccessPlaylist.classList.add("hidden");
+          panelErrorPlaylist.classList.add("hidden");
         }
 
         function showLoading() {
-          panelForm.classList.add("hidden");
-          panelLoading.classList.remove("hidden");
-          panelSuccess.classList.add("hidden");
-          panelError.classList.add("hidden");
+          panelFormPlaylist.classList.add("hidden");
+          panelLoadingPlaylist.classList.remove("hidden");
+          panelSuccessPlaylist.classList.add("hidden");
+          panelErrorPlaylist.classList.add("hidden");
         }
 
         function showSuccess() {
-          panelForm.classList.add("hidden");
-          panelLoading.classList.add("hidden");
-          panelSuccess.classList.remove("hidden");
-          panelError.classList.add("hidden");
+          panelFormPlaylist.classList.add("hidden");
+          panelLoadingPlaylist.classList.add("hidden");
+          panelSuccessPlaylist.classList.remove("hidden");
+          panelErrorPlaylist.classList.add("hidden");
         }
 
         function showError(msg) {
-          panelForm.classList.add("hidden");
-          panelLoading.classList.add("hidden");
-          panelSuccess.classList.add("hidden");
-          panelError.classList.remove("hidden");
+          panelFormPlaylist.classList.add("hidden");
+          panelLoadingPlaylist.classList.add("hidden");
+          panelSuccessPlaylist.classList.add("hidden");
+          panelErrorPlaylist.classList.remove("hidden");
           errorText.textContent = msg || "Unknown error.";
         }
 
@@ -640,7 +818,323 @@
           if (e.key === "Enter") createJob();
         });
         
+        
+        // --- Tab Switching Logic ---
+        const tabPlaylist = $("tab-playlist");
+        const tabVideo = $("tab-video");
+        
+        // Video elements
+        const vidPanelForm = $("vid-panel-form");
+        const vidPanelLoading = $("vid-panel-loading");
+        const vidPanelSuccess = $("vid-panel-success");
+        const vidPanelError = $("vid-panel-error");
+        
+        let activeTab = "playlist"; // "playlist" or "video"
+        
+        function switchTab(tab) {
+          if (activeTab === tab) return;
+          activeTab = tab;
+          
+          const headerEyebrow = $("header-eyebrow");
+          const headerH1 = $("header-h1");
+          const headerDesc = $("header-desc");
+          
+          if (tab === "playlist") {
+            tabPlaylist.className = "rounded-full px-6 py-2 text-sm font-medium text-emerald-400 bg-zinc-800/80 shadow-sm transition-all";
+            tabVideo.className = "rounded-full px-6 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-all";
+            
+            if (headerEyebrow) headerEyebrow.textContent = "YOUTUBE → ONE FILE";
+            if (headerH1) headerH1.textContent = "Ultimate Playlist Merger";
+            if (headerDesc) headerDesc.innerHTML = 'Paste any playlist or single video link. We grab every track in order, merge them, and hand you one\n          <span class="text-emerald-400/90">ULTIMATE_PLAYLIST.mp3</span>.';
+            
+            // Only show if not processing
+            if (!jobId && !vidJobId) {
+              panelFormPlaylist.classList.remove("hidden");
+              vidPanelForm.classList.add("hidden");
+            }
+          } else {
+            tabVideo.className = "rounded-full px-6 py-2 text-sm font-medium text-emerald-400 bg-zinc-800/80 shadow-sm transition-all";
+            tabPlaylist.className = "rounded-full px-6 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-all";
+            
+            if (headerEyebrow) headerEyebrow.textContent = "YOUTUBE → MP3";
+            if (headerH1) headerH1.textContent = "YT to MP3";
+            if (headerDesc) headerDesc.textContent = "Paste any YouTube video link and get a clean MP3 download instantly. No merging, no fuss.";
+            
+            if (!jobId && !vidJobId) {
+              panelFormPlaylist.classList.add("hidden");
+              vidPanelForm.classList.remove("hidden");
+            }
+          }
+        }
+        
+        tabPlaylist.addEventListener("click", () => switchTab("playlist"));
+        tabVideo.addEventListener("click", () => switchTab("video"));
+
+        // --- Video MP3 Logic ---
+        (function() {
+          const VID_STAGE_COPY = {
+            fetching: "Fetching video information...",
+            downloading: "Downloading your MP3...",
+            completed: "Your MP3 is ready!",
+          };
+
+          const urlInput = $("vid-url-input");
+          const btnMerge = $("vid-btn-merge");
+          const btnDownload = $("vid-btn-download");
+          const btnCleanup = $("vid-btn-cleanup");
+          const btnNew = $("vid-btn-new");
+          const btnRetry = $("vid-btn-retry");
+          const loadingTitle = $("vid-loading-title");
+          const loadingSub = $("vid-loading-sub");
+          const errorText = $("vid-error-text");
+          const successFilename = $("vid-success-filename");
+          
+          let vidPollTimer = null;
+          let vidProcessingComplete = false;
+          let currentVidQuality = "320";
+          window.vidJobId = null;
+
+          // Video Quality Dropdown
+          const vBtn = $("vid-quality-dropdown-btn");
+          const vMenu = $("vid-quality-dropdown-menu");
+          const vText = $("vid-quality-selected-text");
+          const vChevron = $("vid-quality-chevron");
+          const vOptions = document.querySelectorAll("#vid-quality-options button");
+          let vOpen = false;
+
+          function closeVidQualityMenu() {
+            vOpen = false;
+            vMenu.classList.add("hidden");
+            vChevron.classList.remove("rotate-180");
+          }
+
+          vBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            vOpen = !vOpen;
+            if (vOpen) {
+              const rect = vBtn.getBoundingClientRect();
+              const spaceBelow = window.innerHeight - rect.bottom;
+              if (spaceBelow < 120) {
+                vMenu.classList.remove("top-full", "mt-2");
+                vMenu.classList.add("bottom-full", "mb-2");
+              } else {
+                vMenu.classList.remove("bottom-full", "mb-2");
+                vMenu.classList.add("top-full", "mt-2");
+              }
+              vMenu.classList.remove("hidden");
+              vChevron.classList.add("rotate-180");
+            } else {
+              closeVidQualityMenu();
+            }
+          });
+
+          document.addEventListener("click", () => {
+            if (vOpen) closeVidQualityMenu();
+          });
+
+          vOptions.forEach(opt => {
+            opt.addEventListener("click", (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              currentVidQuality = opt.dataset.value;
+              vText.textContent = opt.dataset.label;
+              
+              vOptions.forEach(o => {
+                if (o === opt) {
+                  o.classList.add("text-emerald-400", "font-medium");
+                  const span = o.querySelector('.text-xs');
+                  span.classList.remove("text-zinc-500");
+                  span.classList.add("text-emerald-500/80");
+                } else {
+                  o.classList.remove("text-emerald-400", "font-medium");
+                  const span = o.querySelector('.text-xs');
+                  span.classList.remove("text-emerald-500/80");
+                  span.classList.add("text-zinc-500");
+                }
+              });
+              closeVidQualityMenu();
+            });
+          });
+
+          function showVidForm() {
+            if (activeTab === "video") vidPanelForm.classList.remove("hidden");
+            vidPanelLoading.classList.add("hidden");
+            vidPanelSuccess.classList.add("hidden");
+            vidPanelError.classList.add("hidden");
+          }
+
+          function showVidLoading() {
+            vidPanelForm.classList.add("hidden");
+            vidPanelLoading.classList.remove("hidden");
+            vidPanelSuccess.classList.add("hidden");
+            vidPanelError.classList.add("hidden");
+            panelFormPlaylist.classList.add("hidden"); // ensure other form hidden
+          }
+
+          function showVidSuccess() {
+            vidPanelForm.classList.add("hidden");
+            vidPanelLoading.classList.add("hidden");
+            vidPanelSuccess.classList.remove("hidden");
+            vidPanelError.classList.add("hidden");
+          }
+
+          function showVidError(msg) {
+            vidPanelForm.classList.add("hidden");
+            vidPanelLoading.classList.add("hidden");
+            vidPanelSuccess.classList.add("hidden");
+            vidPanelError.classList.remove("hidden");
+            errorText.textContent = msg || "Unknown error.";
+          }
+
+          function stopVidPoll() {
+            if (vidPollTimer) {
+              clearInterval(vidPollTimer);
+              vidPollTimer = null;
+            }
+          }
+
+          function applyVidStage(data) {
+            const stage = data.stage;
+            if (stage === "error") {
+              stopVidPoll();
+              vidProcessingComplete = false;
+              if (isPlayingGame) {
+                window.NeelaTap.hideGame();
+                isPlayingGame = false;
+              }
+              showVidError(data.error || "Processing failed.");
+              return;
+            }
+            if (stage === "completed") {
+              stopVidPoll();
+              vidProcessingComplete = true;
+              const filename = data.filename || "video";
+              btnDownload.href = "/download/" + encodeURIComponent(vidJobId);
+              btnDownload.download = filename + ".mp3";
+              successFilename.textContent = filename + ".mp3";
+              
+              if (isPlayingGame) {
+                window.NeelaTap.showReadyNotification();
+              } else {
+                showVidSuccess();
+              }
+              return;
+            }
+            const title = VID_STAGE_COPY[stage] || "Working…";
+            loadingTitle.textContent = title;
+            loadingSub.textContent = data.message && data.message !== title ? data.message : "";
+          }
+
+          async function pollVidOnce() {
+            if (!vidJobId) return;
+            try {
+              const res = await fetch("/status/" + encodeURIComponent(vidJobId));
+              if (!res.ok) {
+                stopVidPoll();
+                vidProcessingComplete = false;
+                if (isPlayingGame) {
+                  window.NeelaTap.hideGame();
+                  isPlayingGame = false;
+                }
+                showVidError("Could not read job status (" + res.status + ").");
+                return;
+              }
+              const data = await res.json();
+              applyVidStage(data);
+            } catch (e) {
+              stopVidPoll();
+              vidProcessingComplete = false;
+              if (isPlayingGame) {
+                window.NeelaTap.hideGame();
+                isPlayingGame = false;
+              }
+              showVidError("Network error while checking status.");
+            }
+          }
+
+          function startVidPoll() {
+            stopVidPoll();
+            vidPollTimer = setInterval(pollVidOnce, 2000);
+            pollVidOnce();
+          }
+
+          async function createVidJob() {
+            const url = (urlInput.value || "").trim();
+            if (!url) {
+              urlInput.focus();
+              return;
+            }
+            
+            btnMerge.disabled = true;
+            try {
+              const res = await fetch("/create-video-job", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url, quality: currentVidQuality }),
+              });
+              const body = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                throw new Error(formatServerDetail(body.detail));
+              }
+              vidJobId = body.job_id;
+              vidProcessingComplete = false;
+              
+              neelaPrompt.classList.add('active');
+              
+              loadingTitle.textContent = VID_STAGE_COPY.fetching;
+              loadingSub.textContent = "";
+              startVidPoll();
+            } catch (e) {
+              showVidError(e.message || String(e));
+            } finally {
+              btnMerge.disabled = false;
+            }
+          }
+
+          async function cleanupVidJob() {
+            if (!vidJobId) return;
+            btnCleanup.disabled = true;
+            try {
+              await fetch("/cleanup/" + encodeURIComponent(vidJobId), { method: "POST" });
+            } catch (_) {
+            } finally {
+              btnCleanup.disabled = false;
+              vidJobId = null;
+              stopVidPoll();
+              vidProcessingComplete = false;
+              isPlayingGame = false;
+              urlInput.value = "";
+              showVidForm();
+            }
+          }
+
+          btnMerge.addEventListener("click", createVidJob);
+          btnNew.addEventListener("click", () => {
+            vidJobId = null;
+            stopVidPoll();
+            vidProcessingComplete = false;
+            isPlayingGame = false;
+            urlInput.value = "";
+            showVidForm();
+            urlInput.focus();
+          });
+          btnRetry.addEventListener("click", () => {
+            stopVidPoll();
+            vidProcessingComplete = false;
+            isPlayingGame = false;
+            showVidForm();
+            urlInput.focus();
+          });
+          btnCleanup.addEventListener("click", cleanupVidJob);
+
+          urlInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") createVidJob();
+          });
+        })();
+        
         // --- PWA Installation Logic ---
+
         
         // 1. Service Worker Registration
         if ('serviceWorker' in navigator) {

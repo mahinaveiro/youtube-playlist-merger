@@ -482,6 +482,197 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST",
                 pass
 
 
+
+
+def process_single_video(job_id: str, url: str, quality: str = "320") -> None:
+    job_dir = _job_dir(job_id)
+    url = url.strip()
+
+    def set_state(
+        *,
+        stage: str,
+        message: str | None = None,
+        output_path: str | None = None,
+        error: str | None = None,
+    ) -> None:
+        with jobs_lock:
+            j = jobs.get(job_id)
+            if j is None:
+                return
+            j["stage"] = stage
+            if message is not None:
+                j["message"] = message
+            if output_path is not None:
+                j["output_path"] = output_path
+            if error is not None:
+                j["error"] = error
+
+    deno_path = shutil.which("deno")
+    node_path = shutil.which("node")
+    
+    if not deno_path:
+        try:
+            nix_store = Path("/nix/store")
+            if nix_store.exists():
+                for candidate in nix_store.glob("*-deno-*/bin/deno"):
+                    if candidate.is_file():
+                        deno_path = str(candidate)
+                        break
+        except (OSError, PermissionError):
+            pass
+    
+    if not node_path:
+        try:
+            nix_store = Path("/nix/store")
+            if nix_store.exists():
+                for candidate in nix_store.glob("*-nodejs-*/bin/node"):
+                    if candidate.is_file():
+                        node_path = str(candidate)
+                        break
+        except (OSError, PermissionError):
+            pass
+    
+    js_runtimes = {}
+    if deno_path:
+        js_runtimes["deno"] = {"executable": deno_path}
+    if node_path:
+        js_runtimes["node"] = {"executable": node_path}
+    
+    if not js_runtimes:
+        js_runtimes = None
+    
+    cookies_path = BASE_DIR / "cookies.txt"
+    cookies_exist = cookies_path.is_file()
+    
+    bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL", "http://bgutil-provider.railway.internal:4416")
+    bgutil_available = False
+    try:
+        import urllib.request
+        with urllib.request.urlopen(f"{bgutil_url}/health", timeout=2) as response:
+            if response.status == 200:
+                bgutil_available = True
+    except Exception:
+        pass
+    
+    ydl_opts = {
+        "format": "bestaudio/best",
+        "outtmpl": f"{job_dir.as_posix()}/%(title)s.%(ext)s",
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": quality,
+            },
+        ],
+        "quiet": False,
+        "extractaudio": True,
+        "ignoreerrors": True,
+        "noplaylist": True,
+        "no_warnings": False,
+        "sleep_interval": 5,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["tv_embedded", "web_embedded", "tv"],
+            },
+        },
+    }
+    
+    if bgutil_available:
+        ydl_opts["extractor_args"]["youtubepot-bgutil:http"] = {
+            "base_url": bgutil_url,
+        }
+    
+    if cookies_exist:
+        ydl_opts["cookiefile"] = str(cookies_path)
+    
+    if js_runtimes:
+        ydl_opts["js_runtimes"] = js_runtimes
+        ydl_opts["remote_components"] = {"ejs:github"}
+
+    try:
+        job_dir.mkdir(parents=True, exist_ok=True)
+
+        set_state(
+            stage="fetching",
+            message="Fetching video information...",
+        )
+
+        set_state(
+            stage="downloading",
+            message="Downloading MP3...",
+        )
+
+        ytdlp_capture = _YtdlpErrCapture()
+        dl_opts = {**ydl_opts, "quiet": True, "no_warnings": True, "logger": ytdlp_capture}
+        try:
+            with yt_dlp.YoutubeDL(dl_opts) as ydl:
+                rc = ydl.download([url])
+            recent = _ytdlp_recent_messages(ytdlp_capture)
+            if rc != 0:
+                error_msg = f"yt-dlp reported a problem while downloading or extracting audio (exit code {rc}).\n\n"
+                if recent and ("Sign in to confirm you're not a bot" in recent or "bot" in recent.lower()):
+                    error_msg += "🤖 YouTube detected bot activity and blocked the request.\n\n"
+                    error_msg += "SOLUTION: Update your cookies.txt file with fresh YouTube cookies.\n"
+                    error_msg += "1. Install browser extension: 'Get cookies.txt LOCALLY'\n"
+                    error_msg += "2. Go to youtube.com (logged in)\n"
+                    error_msg += "3. Export cookies and replace cookies.txt\n"
+                    error_msg += "4. Redeploy your app\n\n"
+                    error_msg += f"Details:\n{recent}"
+                else:
+                    error_msg += recent if recent else "No detailed message was captured. See server logs."
+                raise RuntimeError(error_msg)
+        except DownloadError as exc:
+            recent = _ytdlp_recent_messages(ytdlp_capture)
+            body = str(exc).strip()
+            if recent and ("Sign in to confirm you're not a bot" in recent or "bot" in recent.lower()):
+                body = "🤖 YouTube detected bot activity and blocked the request.\n\n"
+                body += "SOLUTION: Update your cookies.txt file with fresh YouTube cookies.\n"
+                body += "1. Install browser extension: 'Get cookies.txt LOCALLY'\n"
+                body += "2. Go to youtube.com (logged in)\n"
+                body += "3. Export cookies and replace cookies.txt\n"
+                body += "4. Redeploy your app\n\n"
+                body += f"Details:\n{recent}"
+            elif recent:
+                body = f"{body}\n\nLast yt-dlp output:\n{recent}"
+            raise RuntimeError(body) from exc
+
+        mp3_files = list(job_dir.glob("*.mp3"))
+        if not mp3_files:
+            recent = _ytdlp_recent_messages(ytdlp_capture)
+            raise RuntimeError(
+                "No MP3 files were produced after the download step.\n\n"
+                + (recent if recent else "Check cookies.txt, URL, and that FFmpeg is available on the server.")
+            )
+
+        output_path = str(mp3_files[0].resolve())
+        # We need the filename so we can download it with the right name
+        filename_without_ext = mp3_files[0].stem
+        with jobs_lock:
+            if job_id in jobs:
+                jobs[job_id]["filename"] = filename_without_ext
+
+        set_state(
+            stage="completed",
+            message="Your MP3 is ready!",
+            output_path=output_path,
+        )
+    except subprocess.TimeoutExpired:
+        set_state(
+            stage="error",
+            message=None,
+            error="Operation timed out. Check your connection.",
+        )
+    except Exception as exc:
+        full_msg = str(exc).strip() or "Something went wrong."
+        log.error("Job failed job_id=%s: %s", job_id, full_msg, exc_info=True)
+        msg = full_msg if len(full_msg) <= 8000 else full_msg[:8000] + "…"
+        set_state(stage="error", message=None, error=msg)
+
+
+class CreateVideoJobBody(BaseModel):
+    url: str = Field(..., min_length=4, max_length=2048)
+    quality: str = Field(default="320", pattern="^(320|128)$")
+
 class CreateJobBody(BaseModel):
     url: str = Field(..., min_length=4, max_length=2048)
     filename: str = Field(default="ULTIMATE_PLAYLIST", min_length=1, max_length=100)
@@ -506,6 +697,31 @@ async def manifest():
 async def service_worker():
     return FileResponse(BASE_DIR / "static" / "service-worker.js", media_type="application/javascript")
 
+
+
+@app.post("/create-video-job")
+async def create_video_job(body: CreateVideoJobBody, background_tasks: BackgroundTasks):
+    raw = body.url.strip()
+    if not raw or not re.search(r"https?://", raw, re.I):
+        raise HTTPException(status_code=400, detail="Please provide a valid http(s) URL.")
+    
+    job_id = str(uuid.uuid4())
+    created_at = datetime.utcnow()
+    
+    with jobs_lock:
+        jobs[job_id] = {
+            "stage": "fetching",
+            "message": "Fetching video information...",
+            "output_path": None,
+            "error": None,
+            "filename": "DOWNLOADED_VIDEO",
+            "created_at": created_at.isoformat(),
+        }
+
+    background_tasks.add_task(process_single_video, job_id, raw, body.quality)
+    background_tasks.add_task(schedule_job_cleanup, job_id, 1)
+    
+    return {"job_id": job_id}
 
 @app.post("/create-job")
 async def create_job(body: CreateJobBody, background_tasks: BackgroundTasks):
