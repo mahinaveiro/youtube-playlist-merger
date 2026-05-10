@@ -27,6 +27,8 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from yt_dlp.utils import DownloadError
 
+from fastapi.middleware.cors import CORSMiddleware
+
 BASE_DIR = Path(__file__).resolve().parent
 TEMP_ROOT = Path("/tmp/temp")
 TEMP_ROOT.mkdir(parents=True, exist_ok=True)
@@ -35,6 +37,25 @@ TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 COOKIES_PATH = BASE_DIR / "cookies.txt"
 
 app = FastAPI(title="Ultimate Playlist Merger")
+
+# CORS middleware for Vercel frontend
+allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "")
+allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()] if allowed_origins_env else [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8080",
+    "https://*.vercel.app",
+    "https://*.up.railway.app",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins if allowed_origins_env else ["*"],  # Allow all if not specified
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
