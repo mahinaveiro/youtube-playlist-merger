@@ -31,17 +31,8 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMP_ROOT = Path("/tmp/temp")
 TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 
-# Cookies path priority:
-# 1. COOKIES_PATH environment variable (if set)
-# 2. /tmp/cookies.txt (if /tmp is writable - OpenShift)
-# 3. ./cookies.txt (fallback - Railway/local)
-cookies_path_env = os.environ.get("COOKIES_PATH")
-if cookies_path_env:
-    COOKIES_PATH = Path(cookies_path_env)
-elif Path("/tmp").is_dir() and os.access("/tmp", os.W_OK):
-    COOKIES_PATH = Path("/tmp/cookies.txt")
-else:
-    COOKIES_PATH = BASE_DIR / "cookies.txt"
+# Cookies: use repository file directly
+COOKIES_PATH = BASE_DIR / "cookies.txt"
 
 app = FastAPI(title="Ultimate Playlist Merger")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
@@ -85,23 +76,19 @@ async def startup_diagnostics():
     log.info("=== OpenShift Startup Diagnostics ===")
     log.info(f"PORT: {port}")
     log.info(f"TEMP_ROOT: {TEMP_ROOT} (exists: {TEMP_ROOT.exists()}, writable: {os.access(TEMP_ROOT, os.W_OK) if TEMP_ROOT.exists() else False})")
-    
-    # Log cookies path resolution
-    cookies_path_env = os.environ.get("COOKIES_PATH")
-    if cookies_path_env:
-        log.info(f"COOKIES_PATH (from env): {COOKIES_PATH}")
-    else:
-        log.info(f"COOKIES_PATH (auto-detected): {COOKIES_PATH}")
-    log.info(f"cookies.txt exists: {COOKIES_PATH.exists()}")
+    log.info(f"COOKIES_PATH: {COOKIES_PATH}")
     
     # Check if cookies file exists
-    if COOKIES_PATH.exists():
+    cookies_exist = COOKIES_PATH.exists()
+    log.info(f"cookies.txt exists: {cookies_exist}")
+    
+    if cookies_exist:
         import time
         mtime = COOKIES_PATH.stat().st_mtime
         age_days = (time.time() - mtime) / 86400
-        log.info(f"✓ cookies.txt found (age: {age_days:.0f} days)")
+        log.info(f"✓ yt-dlp will use cookies (age: {age_days:.0f} days)")
     else:
-        log.warning(f"⚠ cookies.txt NOT found at {COOKIES_PATH} - app will work but YouTube may block some requests")
+        log.warning(f"⚠ yt-dlp will NOT use cookies - YouTube may block some requests")
     
     # Check bgutil provider configuration
     bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL")
