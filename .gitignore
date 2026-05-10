@@ -1,4 +1,12 @@
-cookies.txt
+# Python cache
 __pycache__/
-temp/
 *.pyc
+
+# Temporary files (job processing)
+temp/
+
+# Cookies file (contains sensitive YouTube session data)
+# Ignored by default to prevent accidental commits of personal cookies
+# To intentionally commit for deployment: git add -f cookies.txt
+# To remove after deployment: git rm --cached cookies.txt
+cookies.txt
