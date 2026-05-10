@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from yt_dlp.utils import DownloadError
 
 BASE_DIR = Path(__file__).resolve().parent
-TEMP_ROOT = BASE_DIR / "temp"
+TEMP_ROOT = Path("/tmp/temp")
 TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Ultimate Playlist Merger")
