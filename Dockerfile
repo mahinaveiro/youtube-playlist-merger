@@ -11,10 +11,9 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user for OpenShift compatibility
 RUN useradd -m -u 1001 -s /bin/bash appuser
 
-# Install Deno (as root, but in a location accessible to appuser)
-RUN curl -fsSL https://deno.land/install.sh | sh
-ENV DENO_INSTALL="/root/.deno"
-ENV PATH="$DENO_INSTALL/bin:$PATH"
+# Install Deno to /usr/local (accessible to all users)
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
+ENV PATH="/usr/local/bin:$PATH"
 
 # Install Node.js
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \

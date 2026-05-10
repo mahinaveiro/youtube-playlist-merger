@@ -96,16 +96,16 @@ async def startup_diagnostics():
         log.info(f"BGUTIL_PROVIDER_URL: {bgutil_url}")
         log.info("bgutil integration: ENABLED")
         
-        # Test connectivity
+        # Test connectivity using /ping endpoint
         try:
             import urllib.request
-            with urllib.request.urlopen(f"{bgutil_url}/health", timeout=5) as response:
+            with urllib.request.urlopen(f"{bgutil_url}/ping", timeout=5) as response:
                 if response.status == 200:
-                    log.info(f"✓ bgutil provider: CONNECTED at {bgutil_url}")
+                    log.info(f"✓ bgutil provider: CONNECTED at {bgutil_url}/ping")
                 else:
-                    log.warning(f"⚠ bgutil provider responded with status {response.status}")
+                    log.warning(f"⚠ bgutil provider /ping responded with status {response.status}")
         except Exception as e:
-            log.warning(f"⚠ bgutil provider: NOT reachable at {bgutil_url} - {type(e).__name__}: {e}")
+            log.warning(f"⚠ bgutil provider: NOT reachable at {bgutil_url}/ping - {type(e).__name__}: {e}")
             log.info("Will fallback to cookies-only mode")
     else:
         log.info("BGUTIL_PROVIDER_URL: not set")
@@ -317,15 +317,15 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST",
     
     if bgutil_url:
         log.info(f"[Job {job_id}] bgutil provider URL configured: {bgutil_url}")
-        # Test if bgutil provider is reachable
+        # Test if bgutil provider is reachable using /ping endpoint
         try:
             import urllib.request
-            with urllib.request.urlopen(f"{bgutil_url}/health", timeout=2) as response:
+            with urllib.request.urlopen(f"{bgutil_url}/ping", timeout=2) as response:
                 if response.status == 200:
                     bgutil_available = True
-                    log.info(f"[Job {job_id}] ✓ bgutil provider is reachable")
+                    log.info(f"[Job {job_id}] ✓ bgutil provider /ping successful")
                 else:
-                    log.warning(f"[Job {job_id}] bgutil provider returned status {response.status}")
+                    log.warning(f"[Job {job_id}] bgutil provider /ping returned status {response.status}")
         except Exception as e:
             log.warning(f"[Job {job_id}] bgutil provider not reachable: {type(e).__name__}: {e}")
             log.info(f"[Job {job_id}] Falling back to cookies-only mode")
@@ -350,7 +350,7 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST",
         "sleep_interval": 5,  # Avoid YouTube rate limiting
         "extractor_args": {
             "youtube": {
-                "player_client": ["tv_embedded", "web_embedded", "tv"],
+                "player_client": ["web", "web_safari"],
             },
         },
     }
@@ -609,10 +609,10 @@ def process_single_video(job_id: str, url: str, quality: str = "320") -> None:
         log.info(f"[Job {job_id}] bgutil provider URL configured: {bgutil_url}")
         try:
             import urllib.request
-            with urllib.request.urlopen(f"{bgutil_url}/health", timeout=2) as response:
+            with urllib.request.urlopen(f"{bgutil_url}/ping", timeout=2) as response:
                 if response.status == 200:
                     bgutil_available = True
-                    log.info(f"[Job {job_id}] ✓ bgutil provider is reachable")
+                    log.info(f"[Job {job_id}] ✓ bgutil provider /ping successful")
         except Exception as e:
             log.warning(f"[Job {job_id}] bgutil provider not reachable: {type(e).__name__}: {e}")
     else:
@@ -636,7 +636,7 @@ def process_single_video(job_id: str, url: str, quality: str = "320") -> None:
         "sleep_interval": 5,
         "extractor_args": {
             "youtube": {
-                "player_client": ["tv_embedded", "web_embedded", "tv"],
+                "player_client": ["web", "web_safari"],
             },
         },
     }
