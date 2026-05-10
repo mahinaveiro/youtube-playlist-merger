@@ -1,6 +1,7 @@
 fastapi
 uvicorn
-yt-dlp
+yt-dlp>=2024.4.9
 yt-dlp-ejs
+bgutil-ytdlp-pot-provider
 python-multipart
 jinja2

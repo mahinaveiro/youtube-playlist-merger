@@ -87,6 +87,27 @@ async def startup_diagnostics():
     else:
         log.warning(f"⚠ cookies.txt NOT found at {COOKIES_PATH} - app will work but YouTube may block some requests")
     
+    # Check bgutil provider configuration
+    bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL")
+    if bgutil_url:
+        log.info(f"BGUTIL_PROVIDER_URL: {bgutil_url}")
+        log.info("bgutil integration: ENABLED")
+        
+        # Test connectivity
+        try:
+            import urllib.request
+            with urllib.request.urlopen(f"{bgutil_url}/health", timeout=5) as response:
+                if response.status == 200:
+                    log.info(f"✓ bgutil provider: CONNECTED at {bgutil_url}")
+                else:
+                    log.warning(f"⚠ bgutil provider responded with status {response.status}")
+        except Exception as e:
+            log.warning(f"⚠ bgutil provider: NOT reachable at {bgutil_url} - {type(e).__name__}: {e}")
+            log.info("Will fallback to cookies-only mode")
+    else:
+        log.info("BGUTIL_PROVIDER_URL: not set")
+        log.info("bgutil integration: DISABLED (using cookies only)")
+    
     deno = shutil.which("deno")
     node = shutil.which("node")
     ffmpeg = shutil.which("ffmpeg")
@@ -121,7 +142,7 @@ async def startup_diagnostics():
     # Check bgutil-ytdlp-pot-provider plugin
     try:
         import bgutil_ytdlp_pot_provider
-        log.info(f"bgutil-ytdlp-pot-provider: {bgutil_ytdlp_pot_provider.__version__}")
+        log.info(f"✓ bgutil-ytdlp-pot-provider: {bgutil_ytdlp_pot_provider.__version__}")
     except ImportError:
         # Plugin is installed but can't be imported directly - this is normal for yt-dlp plugins
         # Check if it's in pip list instead
@@ -134,23 +155,11 @@ async def startup_diagnostics():
                 timeout=5
             )
             if "bgutil-ytdlp-pot-provider" in result.stdout:
-                log.info("bgutil-ytdlp-pot-provider: installed (yt-dlp plugin)")
+                log.info("✓ bgutil-ytdlp-pot-provider: installed (yt-dlp plugin)")
             else:
-                log.warning("bgutil-ytdlp-pot-provider: NOT found in pip list")
+                log.warning("⚠ bgutil-ytdlp-pot-provider: NOT found in pip list")
         except Exception:
             log.info("bgutil-ytdlp-pot-provider: unable to verify (check manually)")
-    
-    # Test bgutil provider connectivity (optional feature)
-    bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL", "http://bgutil-provider.railway.internal:4416")
-    try:
-        import urllib.request
-        with urllib.request.urlopen(f"{bgutil_url}/health", timeout=5) as response:
-            if response.status == 200:
-                log.info(f"✓ bgutil provider: CONNECTED at {bgutil_url}")
-            else:
-                log.info(f"bgutil provider responded with status {response.status}")
-    except Exception:
-        log.info(f"bgutil provider: not available (optional - app will use cookies only)")
     
     log.info("===========================")
     log.info("✓ Application startup complete - ready to accept requests")
@@ -300,18 +309,25 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST",
     
     # bgutil PO Token provider (optional - enhances bot detection bypass)
     # If not available, app will work with cookies.txt alone
-    bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL", "http://bgutil-provider.railway.internal:4416")
-    
-    # Only add bgutil config if it's actually reachable
+    bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL")
     bgutil_available = False
-    try:
-        import urllib.request
-        with urllib.request.urlopen(f"{bgutil_url}/health", timeout=2) as response:
-            if response.status == 200:
-                bgutil_available = True
-                log.info(f"✓ bgutil provider connected at {bgutil_url}")
-    except Exception as e:
-        log.info(f"bgutil provider not available (will use cookies only): {e}")
+    
+    if bgutil_url:
+        log.info(f"[Job {job_id}] bgutil provider URL configured: {bgutil_url}")
+        # Test if bgutil provider is reachable
+        try:
+            import urllib.request
+            with urllib.request.urlopen(f"{bgutil_url}/health", timeout=2) as response:
+                if response.status == 200:
+                    bgutil_available = True
+                    log.info(f"[Job {job_id}] ✓ bgutil provider is reachable")
+                else:
+                    log.warning(f"[Job {job_id}] bgutil provider returned status {response.status}")
+        except Exception as e:
+            log.warning(f"[Job {job_id}] bgutil provider not reachable: {type(e).__name__}: {e}")
+            log.info(f"[Job {job_id}] Falling back to cookies-only mode")
+    else:
+        log.info(f"[Job {job_id}] BGUTIL_PROVIDER_URL not set - using cookies only")
     
     ydl_opts = {
         "format": "bestaudio/best",
@@ -336,11 +352,16 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST",
         },
     }
     
-    # Only add bgutil config if service is reachable
-    if bgutil_available:
+    # Add bgutil HTTP provider configuration if available
+    if bgutil_available and bgutil_url:
+        # The correct extractor arg key for bgutil-ytdlp-pot-provider HTTP mode
         ydl_opts["extractor_args"]["youtubepot-bgutil:http"] = {
             "base_url": bgutil_url,
         }
+        log.info(f"[Job {job_id}] ✓ bgutil HTTP provider integration ENABLED")
+        log.info(f"[Job {job_id}] extractor_args['youtubepot-bgutil:http'] = {{'base_url': '{bgutil_url}'}}")
+    else:
+        log.info(f"[Job {job_id}] bgutil integration DISABLED - using cookies only")
     
     # Add optional configs only if available
     if cookies_exist:
@@ -351,6 +372,16 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST",
         ydl_opts["remote_components"] = {"ejs:github"}
     else:
         log.warning("Proceeding without JS runtime - may fail on signature-protected videos")
+
+    # Log final yt-dlp configuration before execution
+    log.info(f"[Job {job_id}] Final yt-dlp configuration:")
+    log.info(f"[Job {job_id}]   - format: {ydl_opts.get('format')}")
+    log.info(f"[Job {job_id}]   - cookiefile: {ydl_opts.get('cookiefile', 'NOT SET')}")
+    log.info(f"[Job {job_id}]   - sleep_interval: {ydl_opts.get('sleep_interval')}")
+    log.info(f"[Job {job_id}]   - extractor_args: {ydl_opts.get('extractor_args')}")
+    if js_runtimes:
+        log.info(f"[Job {job_id}]   - js_runtimes: {list(js_runtimes.keys())}")
+    log.info(f"[Job {job_id}] Starting playlist download...")
 
     try:
         job_dir.mkdir(parents=True, exist_ok=True)
@@ -567,15 +598,22 @@ def process_single_video(job_id: str, url: str, quality: str = "320") -> None:
     
     cookies_exist = COOKIES_PATH.is_file()
     
-    bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL", "http://bgutil-provider.railway.internal:4416")
+    # bgutil PO Token provider configuration
+    bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL")
     bgutil_available = False
-    try:
-        import urllib.request
-        with urllib.request.urlopen(f"{bgutil_url}/health", timeout=2) as response:
-            if response.status == 200:
-                bgutil_available = True
-    except Exception:
-        pass
+    
+    if bgutil_url:
+        log.info(f"[Job {job_id}] bgutil provider URL configured: {bgutil_url}")
+        try:
+            import urllib.request
+            with urllib.request.urlopen(f"{bgutil_url}/health", timeout=2) as response:
+                if response.status == 200:
+                    bgutil_available = True
+                    log.info(f"[Job {job_id}] ✓ bgutil provider is reachable")
+        except Exception as e:
+            log.warning(f"[Job {job_id}] bgutil provider not reachable: {type(e).__name__}: {e}")
+    else:
+        log.info(f"[Job {job_id}] BGUTIL_PROVIDER_URL not set - using cookies only")
     
     ydl_opts = {
         "format": "bestaudio/best",
@@ -600,10 +638,15 @@ def process_single_video(job_id: str, url: str, quality: str = "320") -> None:
         },
     }
     
-    if bgutil_available:
+    # Add bgutil HTTP provider configuration if available
+    if bgutil_available and bgutil_url:
         ydl_opts["extractor_args"]["youtubepot-bgutil:http"] = {
             "base_url": bgutil_url,
         }
+        log.info(f"[Job {job_id}] ✓ bgutil HTTP provider integration ENABLED")
+        log.info(f"[Job {job_id}] extractor_args['youtubepot-bgutil:http'] = {{'base_url': '{bgutil_url}'}}")
+    else:
+        log.info(f"[Job {job_id}] bgutil integration DISABLED - using cookies only")
     
     if cookies_exist:
         ydl_opts["cookiefile"] = str(COOKIES_PATH)
@@ -611,6 +654,16 @@ def process_single_video(job_id: str, url: str, quality: str = "320") -> None:
     if js_runtimes:
         ydl_opts["js_runtimes"] = js_runtimes
         ydl_opts["remote_components"] = {"ejs:github"}
+
+    # Log final yt-dlp configuration before execution
+    log.info(f"[Job {job_id}] Final yt-dlp configuration:")
+    log.info(f"[Job {job_id}]   - format: {ydl_opts.get('format')}")
+    log.info(f"[Job {job_id}]   - cookiefile: {ydl_opts.get('cookiefile', 'NOT SET')}")
+    log.info(f"[Job {job_id}]   - sleep_interval: {ydl_opts.get('sleep_interval')}")
+    log.info(f"[Job {job_id}]   - extractor_args: {ydl_opts.get('extractor_args')}")
+    if js_runtimes:
+        log.info(f"[Job {job_id}]   - js_runtimes: {list(js_runtimes.keys())}")
+    log.info(f"[Job {job_id}] Starting video download...")
 
     try:
         job_dir.mkdir(parents=True, exist_ok=True)
