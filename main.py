@@ -781,10 +781,16 @@ class CreateJobBody(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
+    # Get API URL from environment or use request base URL
+    api_url = os.environ.get("API_URL", str(request.base_url).rstrip("/"))
+    
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"request": request}
+        context={
+            "request": request,
+            "api_url": api_url,
+        }
     )
 
 

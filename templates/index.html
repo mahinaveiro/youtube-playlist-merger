@@ -422,8 +422,16 @@
 
     <script src="/static/neela-tap.js"></script>
     <script>
+      // API Base URL injected from backend
+      window.API_BASE_URL = "{{ api_url }}";
+    </script>
+    <script>
       (function () {
         'use strict';
+
+        // API Base URL - can be overridden by setting window.API_BASE_URL before this script
+        const API_BASE_URL = window.API_BASE_URL || window.location.origin;
+        console.log('API Base URL:', API_BASE_URL);
 
         const STAGE_COPY = {
           fetching: "Fetching playlist information...",
@@ -684,7 +692,7 @@
             stopPoll();
             processingComplete = true;
             const filename = data.filename || "ULTIMATE_PLAYLIST";
-            btnDownload.href = "/download/" + encodeURIComponent(jobId);
+            btnDownload.href = API_BASE_URL + "/download/" + encodeURIComponent(jobId);
             btnDownload.download = filename + ".mp3";
             successFilename.textContent = filename + ".mp3";
             
@@ -704,7 +712,7 @@
         async function pollOnce() {
           if (!jobId) return;
           try {
-            const res = await fetch("/status/" + encodeURIComponent(jobId));
+            const res = await fetch(API_BASE_URL + "/status/" + encodeURIComponent(jobId));
             if (!res.ok) {
               stopPoll();
               processingComplete = false;
@@ -744,7 +752,7 @@
           
           btnMerge.disabled = true;
           try {
-            const res = await fetch("/create-job", {
+            const res = await fetch(API_BASE_URL + "/create-job", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ url, filename, quality: currentQuality }),
@@ -773,7 +781,7 @@
           if (!jobId) return;
           btnCleanup.disabled = true;
           try {
-            await fetch("/cleanup/" + encodeURIComponent(jobId), { method: "POST" });
+            await fetch(API_BASE_URL + "/cleanup/" + encodeURIComponent(jobId), { method: "POST" });
           } catch (_) {
             /* still reset UI */
           } finally {
@@ -1016,7 +1024,7 @@
               stopVidPoll();
               vidProcessingComplete = true;
               const filename = data.filename || "video";
-              btnDownload.href = "/download/" + encodeURIComponent(vidJobId);
+              btnDownload.href = API_BASE_URL + "/download/" + encodeURIComponent(vidJobId);
               btnDownload.download = filename + ".mp3";
               successFilename.textContent = filename + ".mp3";
               
@@ -1035,7 +1043,7 @@
           async function pollVidOnce() {
             if (!vidJobId) return;
             try {
-              const res = await fetch("/status/" + encodeURIComponent(vidJobId));
+              const res = await fetch(API_BASE_URL + "/status/" + encodeURIComponent(vidJobId));
               if (!res.ok) {
                 stopVidPoll();
                 vidProcessingComplete = false;
@@ -1074,7 +1082,7 @@
             
             btnMerge.disabled = true;
             try {
-              const res = await fetch("/create-video-job", {
+              const res = await fetch(API_BASE_URL + "/create-video-job", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ url, quality: currentVidQuality }),
@@ -1102,7 +1110,7 @@
             if (!vidJobId) return;
             btnCleanup.disabled = true;
             try {
-              await fetch("/cleanup/" + encodeURIComponent(vidJobId), { method: "POST" });
+              await fetch(API_BASE_URL + "/cleanup/" + encodeURIComponent(vidJobId), { method: "POST" });
             } catch (_) {
             } finally {
               btnCleanup.disabled = false;
