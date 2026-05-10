@@ -1,4 +1,4 @@
-# Alternative to nixpacks.toml - use this if Runway supports Dockerfile
+# OpenShift-compatible Dockerfile
 FROM python:3.11-slim
 
 # Install system dependencies
@@ -8,7 +8,10 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Deno
+# Create non-root user for OpenShift compatibility
+RUN useradd -m -u 1001 -s /bin/bash appuser
+
+# Install Deno (as root, but in a location accessible to appuser)
 RUN curl -fsSL https://deno.land/install.sh | sh
 ENV DENO_INSTALL="/root/.deno"
 ENV PATH="$DENO_INSTALL/bin:$PATH"
@@ -28,6 +31,13 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 # Copy application files
 COPY . .
 
+# Make /app readable by all users (OpenShift runs as arbitrary UID)
+RUN chmod -R g+rwX /app && \
+    chmod -R o+rX /app
+
+# Ensure /tmp is writable (OpenShift default)
+RUN mkdir -p /tmp/temp && chmod -R 777 /tmp/temp
+
 # Verify installations (non-blocking)
 RUN echo "=== Build Diagnostics ===" && \
     which deno && deno --version && \
@@ -37,8 +47,10 @@ RUN echo "=== Build Diagnostics ===" && \
     pip list | grep bgutil || echo "bgutil-ytdlp-pot-provider: check at runtime" && \
     echo "========================="
 
-# Expose port
-ENV PORT=8080
+# Switch to non-root user (OpenShift will override with arbitrary UID, but this is good practice)
+USER 1001
+
+# Expose port 8080 (OpenShift default)
 EXPOSE 8080
 
 # Run the application

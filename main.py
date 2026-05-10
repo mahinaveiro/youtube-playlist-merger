@@ -31,6 +31,9 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMP_ROOT = Path("/tmp/temp")
 TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 
+# Use /tmp for cookies in OpenShift (writable), fallback to BASE_DIR for Railway
+COOKIES_PATH = Path("/tmp/cookies.txt") if Path("/tmp").is_dir() and os.access("/tmp", os.W_OK) else BASE_DIR / "cookies.txt"
+
 app = FastAPI(title="Ultimate Playlist Merger")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -39,6 +42,10 @@ jobs_lock = Lock()
 jobs: dict[str, dict] = {}
 
 log = logging.getLogger("ultimate_playlist_merger")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 
 async def schedule_job_cleanup(job_id: str, delay_hours: int = 1):
@@ -62,14 +69,31 @@ async def schedule_job_cleanup(job_id: str, delay_hours: int = 1):
 async def startup_diagnostics():
     """Log runtime paths and yt-dlp-ejs availability on startup."""
     import os
+    
+    # Get PORT from environment
+    port = os.environ.get("PORT", "8080")
+    
+    log.info("=== OpenShift Startup Diagnostics ===")
+    log.info(f"PORT: {port}")
+    log.info(f"TEMP_ROOT: {TEMP_ROOT} (exists: {TEMP_ROOT.exists()}, writable: {os.access(TEMP_ROOT, os.W_OK) if TEMP_ROOT.exists() else False})")
+    log.info(f"COOKIES_PATH: {COOKIES_PATH} (exists: {COOKIES_PATH.exists()})")
+    
+    # Check if cookies file exists
+    if COOKIES_PATH.exists():
+        import time
+        mtime = COOKIES_PATH.stat().st_mtime
+        age_days = (time.time() - mtime) / 86400
+        log.info(f"✓ cookies.txt found (age: {age_days:.0f} days)")
+    else:
+        log.warning(f"⚠ cookies.txt NOT found at {COOKIES_PATH} - app will work but YouTube may block some requests")
+    
     deno = shutil.which("deno")
     node = shutil.which("node")
     ffmpeg = shutil.which("ffmpeg")
     
-    log.info("=== Startup Diagnostics ===")
     log.info(f"deno (PATH): {deno or 'NOT FOUND'}")
     log.info(f"node (PATH): {node or 'NOT FOUND'}")
-    log.info(f"ffmpeg (PATH): {ffmpeg or 'NOT FOUND'}")
+    log.info(f"ffmpeg (PATH): {ffmpeg or '⚠ NOT FOUND - REQUIRED'}")
     
     # Search Nix store if not on PATH
     try:
@@ -90,7 +114,7 @@ async def startup_diagnostics():
     
     try:
         from yt_dlp.dependencies import yt_dlp_ejs
-        log.info(f"yt-dlp-ejs: {'installed' if yt_dlp_ejs else 'NOT installed'}")
+        log.info(f"yt-dlp-ejs: {'✓ installed' if yt_dlp_ejs else '⚠ NOT installed'}")
     except ImportError:
         log.warning("yt-dlp-ejs: import failed")
     
@@ -129,6 +153,7 @@ async def startup_diagnostics():
         log.info(f"bgutil provider: not available (optional - app will use cookies only)")
     
     log.info("===========================")
+    log.info("✓ Application startup complete - ready to accept requests")
 
 
 def _strip_ansi(text: str) -> str:
@@ -261,15 +286,14 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST",
         js_runtimes = None
     
     # Check if cookies file exists and is readable
-    cookies_path = BASE_DIR / "cookies.txt"
-    cookies_exist = cookies_path.is_file()
+    cookies_exist = COOKIES_PATH.is_file()
     
     if not cookies_exist:
-        log.warning(f"cookies.txt not found at {cookies_path}. YouTube may block requests as bot.")
+        log.warning(f"cookies.txt not found at {COOKIES_PATH}. YouTube may block requests as bot.")
     else:
         # Check if cookies are recent (modified within last 30 days)
         import time
-        mtime = cookies_path.stat().st_mtime
+        mtime = COOKIES_PATH.stat().st_mtime
         age_days = (time.time() - mtime) / 86400
         if age_days > 30:
             log.warning(f"cookies.txt is {age_days:.0f} days old. Consider refreshing for better reliability.")
@@ -320,7 +344,7 @@ def process_playlist(job_id: str, url: str, filename: str = "ULTIMATE_PLAYLIST",
     
     # Add optional configs only if available
     if cookies_exist:
-        ydl_opts["cookiefile"] = str(cookies_path)
+        ydl_opts["cookiefile"] = str(COOKIES_PATH)
     
     if js_runtimes:
         ydl_opts["js_runtimes"] = js_runtimes
@@ -541,8 +565,7 @@ def process_single_video(job_id: str, url: str, quality: str = "320") -> None:
     if not js_runtimes:
         js_runtimes = None
     
-    cookies_path = BASE_DIR / "cookies.txt"
-    cookies_exist = cookies_path.is_file()
+    cookies_exist = COOKIES_PATH.is_file()
     
     bgutil_url = os.environ.get("BGUTIL_PROVIDER_URL", "http://bgutil-provider.railway.internal:4416")
     bgutil_available = False
@@ -583,7 +606,7 @@ def process_single_video(job_id: str, url: str, quality: str = "320") -> None:
         }
     
     if cookies_exist:
-        ydl_opts["cookiefile"] = str(cookies_path)
+        ydl_opts["cookiefile"] = str(COOKIES_PATH)
     
     if js_runtimes:
         ydl_opts["js_runtimes"] = js_runtimes
@@ -685,6 +708,31 @@ async def home(request: Request):
         request=request,
         name="index.html",
         context={"request": request}
+    )
+
+
+@app.get("/health")
+async def health():
+    """Lightweight health check endpoint for OpenShift probes."""
+    return JSONResponse(
+        status_code=200,
+        content={"status": "healthy", "service": "ultimate-playlist-merger"}
+    )
+
+
+@app.get("/api/status")
+async def api_status():
+    """API status endpoint with more details."""
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "ok",
+            "service": "ultimate-playlist-merger",
+            "temp_path": str(TEMP_ROOT),
+            "temp_writable": os.access(TEMP_ROOT, os.W_OK) if TEMP_ROOT.exists() else False,
+            "cookies_available": COOKIES_PATH.exists(),
+            "active_jobs": len(jobs),
+        }
     )
 
 
