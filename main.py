@@ -36,38 +36,42 @@ TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 # Cookies: use repository file directly
 COOKIES_PATH = BASE_DIR / "cookies.txt"
 
+# Setup logging first
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+log = logging.getLogger("ultimate_playlist_merger")
+
 app = FastAPI(title="Ultimate Playlist Merger")
 
 # CORS middleware for Vercel frontend
 allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "")
-allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()] if allowed_origins_env else [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://localhost:8080",
-    "https://*.vercel.app",
-    "https://*.up.railway.app",
-]
+
+if allowed_origins_env:
+    # Parse comma-separated origins from environment variable
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+    log.info(f"CORS: Using origins from ALLOWED_ORIGINS: {allowed_origins}")
+else:
+    # Development mode: allow all origins
+    allowed_origins = ["*"]
+    log.info("CORS: ALLOWED_ORIGINS not set - allowing all origins (development mode)")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if allowed_origins_env else ["*"],  # Allow all if not specified
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+log.info(f"✓ CORS middleware enabled with origins: {allowed_origins}")
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 jobs_lock = Lock()
 jobs: dict[str, dict] = {}
-
-log = logging.getLogger("ultimate_playlist_merger")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-
 
 async def schedule_job_cleanup(job_id: str, delay_hours: int = 1):
     """Schedule automatic cleanup of job files after specified hours."""
