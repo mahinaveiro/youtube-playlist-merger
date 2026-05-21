@@ -45,27 +45,21 @@ log = logging.getLogger("ultimate_playlist_merger")
 
 app = FastAPI(title="Ultimate Playlist Merger")
 
-# CORS middleware for Vercel frontend
-allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "")
-
-if allowed_origins_env:
-    # Parse comma-separated origins from environment variable
-    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
-    log.info(f"CORS: Using origins from ALLOWED_ORIGINS: {allowed_origins}")
-else:
-    # Development mode: allow all origins
-    allowed_origins = ["*"]
-    log.info("CORS: ALLOWED_ORIGINS not set - allowing all origins (development mode)")
-
+# CORS middleware - simplified and stabilized configuration
+# Allow all origins with wildcard for maximum compatibility
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-log.info(f"✓ CORS middleware enabled with origins: {allowed_origins}")
+log.info("✓ CORS middleware enabled")
+log.info(f"  - allow_origins: ['*']")
+log.info(f"  - allow_credentials: True")
+log.info(f"  - allow_methods: ['*']")
+log.info(f"  - allow_headers: ['*']")
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -100,6 +94,16 @@ async def startup_diagnostics():
     
     log.info("=== OpenShift Startup Diagnostics ===")
     log.info(f"PORT: {port}")
+    
+    # Log CORS configuration
+    log.info("=== CORS Configuration ===")
+    log.info("CORS middleware: ENABLED")
+    log.info("  - allow_origins: ['*'] (all origins allowed)")
+    log.info("  - allow_credentials: True")
+    log.info("  - allow_methods: ['*']")
+    log.info("  - allow_headers: ['*']")
+    log.info("Test endpoint: GET /cors-test")
+    
     log.info(f"TEMP_ROOT: {TEMP_ROOT} (exists: {TEMP_ROOT.exists()}, writable: {os.access(TEMP_ROOT, os.W_OK) if TEMP_ROOT.exists() else False})")
     log.info(f"COOKIES_PATH: {COOKIES_PATH}")
     
@@ -819,6 +823,19 @@ async def api_status():
             "temp_writable": os.access(TEMP_ROOT, os.W_OK) if TEMP_ROOT.exists() else False,
             "cookies_available": COOKIES_PATH.exists(),
             "active_jobs": len(jobs),
+        }
+    )
+
+
+@app.get("/cors-test")
+async def cors_test():
+    """Simple CORS test endpoint to verify cross-origin requests work."""
+    return JSONResponse(
+        status_code=200,
+        content={
+            "cors": "enabled",
+            "message": "CORS is working correctly",
+            "timestamp": datetime.utcnow().isoformat(),
         }
     )
 
